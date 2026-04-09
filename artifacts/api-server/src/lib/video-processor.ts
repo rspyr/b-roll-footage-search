@@ -40,6 +40,7 @@ export async function extractFrames(videoPath: string, videoId: number, interval
   }
 
   await execFileAsync("ffmpeg", [
+    "-y",
     "-i", videoPath,
     "-vf", `fps=1/${intervalSec}`,
     "-q:v", "2",
@@ -148,6 +149,9 @@ export async function processVideo(videoId: number): Promise<void> {
   }
 
   await db.update(videosTable).set({ status: "processing" }).where(eq(videosTable.id, videoId));
+
+  await db.delete(framesTable).where(eq(framesTable.videoId, videoId));
+  await db.delete(transcriptionsTable).where(eq(transcriptionsTable.videoId, videoId));
 
   try {
     let videoPath = video.localPath;

@@ -10,13 +10,12 @@ export const framesTable = pgTable("frames", {
   timestampSec: real("timestamp_sec").notNull(),
   imagePath: text("image_path").notNull(),
   description: text("description"),
-  descriptionTsv: text("description_tsv"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("frames_video_id_idx").on(table.videoId),
   index("frames_description_tsv_idx").using("gin", sql`to_tsvector('english', ${table.description})`),
 ]);
 
-export const insertFrameSchema = createInsertSchema(framesTable).omit({ id: true, createdAt: true, descriptionTsv: true });
+export const insertFrameSchema = createInsertSchema(framesTable).omit({ id: true, createdAt: true });
 export type InsertFrame = z.infer<typeof insertFrameSchema>;
 export type Frame = typeof framesTable.$inferSelect;

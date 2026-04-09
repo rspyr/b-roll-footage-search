@@ -10,13 +10,12 @@ export const transcriptionsTable = pgTable("transcriptions", {
   startSec: real("start_sec").notNull(),
   endSec: real("end_sec").notNull(),
   content: text("content").notNull(),
-  contentTsv: text("content_tsv"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("transcriptions_video_id_idx").on(table.videoId),
   index("transcriptions_content_tsv_idx").using("gin", sql`to_tsvector('english', ${table.content})`),
 ]);
 
-export const insertTranscriptionSchema = createInsertSchema(transcriptionsTable).omit({ id: true, createdAt: true, contentTsv: true });
+export const insertTranscriptionSchema = createInsertSchema(transcriptionsTable).omit({ id: true, createdAt: true });
 export type InsertTranscription = z.infer<typeof insertTranscriptionSchema>;
 export type Transcription = typeof transcriptionsTable.$inferSelect;
