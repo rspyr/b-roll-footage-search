@@ -18,11 +18,6 @@ const VIDEO_MIME_TYPES = [
   "video/x-flv",
 ];
 
-const SHARED_DRIVE_PARAMS = {
-  supportsAllDrives: "true",
-  includeItemsFromAllDrives: "true",
-};
-
 export interface DriveFolder {
   id: string;
   name: string;
@@ -36,24 +31,6 @@ export interface DriveFile {
   size: string | null;
 }
 
-export async function getFolderMetadata(folderId: string): Promise<DriveFolder> {
-  const params = new URLSearchParams({
-    fields: "id,name,mimeType",
-    ...SHARED_DRIVE_PARAMS,
-  });
-
-  const response = await connectors.proxy("google-drive", `/drive/v3/files/${folderId}?${params.toString()}`, {
-    method: "GET",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to get folder metadata for ${folderId}: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json() as DriveFolder;
-  return data;
-}
-
 export async function listFolders(parentId?: string): Promise<DriveFolder[]> {
   let query = "mimeType='application/vnd.google-apps.folder' and trashed=false";
   if (parentId) {
@@ -65,7 +42,6 @@ export async function listFolders(parentId?: string): Promise<DriveFolder[]> {
     fields: "files(id,name,mimeType)",
     orderBy: "name",
     pageSize: "100",
-    ...SHARED_DRIVE_PARAMS,
   });
 
   const response = await connectors.proxy("google-drive", `/drive/v3/files?${params.toString()}`, {
@@ -85,7 +61,6 @@ export async function listVideoFiles(folderId: string): Promise<DriveFile[]> {
     fields: "files(id,name,mimeType,size)",
     orderBy: "name",
     pageSize: "100",
-    ...SHARED_DRIVE_PARAMS,
   });
 
   const response = await connectors.proxy("google-drive", `/drive/v3/files?${params.toString()}`, {
@@ -102,10 +77,7 @@ export async function downloadFile(fileId: string, destPath: string): Promise<vo
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const params = new URLSearchParams({
-    alt: "media",
-    ...SHARED_DRIVE_PARAMS,
-  });
+  const params = new URLSearchParams({ alt: "media" });
   const response = await connectors.proxy("google-drive", `/drive/v3/files/${fileId}?${params.toString()}`, {
     method: "GET",
   });
