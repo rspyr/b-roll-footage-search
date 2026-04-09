@@ -64,7 +64,7 @@ function SearchResults({
             onClick={() => onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}`)}
           >
             <div className="aspect-video bg-muted relative">
-              {result.imagePath ? (
+              {result.imagePath && !result.imagePath.startsWith("manual/") ? (
                 <img 
                   src={`/api/frames/${result.imagePath}`} 
                   alt="Video frame" 

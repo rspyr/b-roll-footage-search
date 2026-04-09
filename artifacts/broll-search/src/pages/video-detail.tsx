@@ -10,6 +10,7 @@ import {
   getGetProcessingStatusQueryKey,
   getListVideosQueryKey,
   getListFoldersQueryKey,
+  getSearchContentQueryKey,
 } from "@workspace/api-client-react";
 import {
   Loader2,
@@ -108,6 +109,7 @@ export default function VideoDetail() {
 
   const invalidateVideo = () => {
     queryClient.invalidateQueries({ queryKey: getGetVideoQueryKey(id) });
+    queryClient.invalidateQueries({ queryKey: getSearchContentQueryKey() });
   };
 
   const invalidateAll = () => {
