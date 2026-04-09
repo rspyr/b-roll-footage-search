@@ -34,7 +34,7 @@ A semantic video search application that connects to Google Drive, processes vid
 - `GET /api/drive/folders` — List Google Drive folders
 - `GET /api/drive/files?folderId=X` — List video files in a Drive folder
 - `GET /api/search?q=X&type=all|visual|audio` — Full-text search across frames and transcriptions
-- `GET /api/processing/status` — Processing queue overview
+- `GET /api/processing-status` — Processing queue overview
 - `GET /api/frames/*` — Static file serving for extracted frame images
 
 ### Processing Pipeline

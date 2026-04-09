@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { sql } from "drizzle-orm";
-import { db, framesTable, transcriptionsTable, videosTable } from "@workspace/db";
+import { pool } from "@workspace/db";
 import { SearchContentQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -14,90 +13,81 @@ router.get("/search", async (req, res): Promise<void> => {
 
   const { q, type = "all", limit = 20, offset = 0 } = params.data;
 
-  const tsQuery = q.trim().split(/\s+/).join(" & ");
-  const results: Array<{
-    type: "frame" | "transcription";
-    videoId: number;
-    videoTitle: string;
-    timestampSec: number;
-    endSec: number | null;
-    content: string;
-    imagePath: string | null;
-    rank: number;
-  }> = [];
+  const unionParts: string[] = [];
 
   if (type === "all" || type === "visual") {
-    const frameResults = await db.execute(sql`
+    unionParts.push(`
       SELECT
-        f.id,
+        'frame' as type,
         f.video_id as "videoId",
         v.title as "videoTitle",
         f.timestamp_sec as "timestampSec",
+        NULL::double precision as "endSec",
+        f.description as content,
         f.image_path as "imagePath",
-        f.description as "content",
-        ts_rank(to_tsvector('english', f.description), plainto_tsquery('english', ${q})) as rank
+        ts_rank(to_tsvector('english', f.description), plainto_tsquery('english', $1)) as rank
       FROM frames f
       JOIN videos v ON v.id = f.video_id
       WHERE f.description IS NOT NULL
-        AND to_tsvector('english', f.description) @@ plainto_tsquery('english', ${q})
-      ORDER BY rank DESC
-      LIMIT ${limit}
-      OFFSET ${offset}
+        AND to_tsvector('english', f.description) @@ plainto_tsquery('english', $1)
     `);
-
-    for (const row of frameResults.rows) {
-      results.push({
-        type: "frame",
-        videoId: Number(row.videoId),
-        videoTitle: String(row.videoTitle),
-        timestampSec: Number(row.timestampSec),
-        endSec: null,
-        content: String(row.content),
-        imagePath: row.imagePath ? String(row.imagePath) : null,
-        rank: Number(row.rank),
-      });
-    }
   }
 
   if (type === "all" || type === "audio") {
-    const transcriptionResults = await db.execute(sql`
+    unionParts.push(`
       SELECT
-        t.id,
+        'transcription' as type,
         t.video_id as "videoId",
         v.title as "videoTitle",
         t.start_sec as "timestampSec",
         t.end_sec as "endSec",
-        t.content as "content",
-        ts_rank(to_tsvector('english', t.content), plainto_tsquery('english', ${q})) as rank
+        t.content as content,
+        NULL::text as "imagePath",
+        ts_rank(to_tsvector('english', t.content), plainto_tsquery('english', $1)) as rank
       FROM transcriptions t
       JOIN videos v ON v.id = t.video_id
-      WHERE to_tsvector('english', t.content) @@ plainto_tsquery('english', ${q})
-      ORDER BY rank DESC
-      LIMIT ${limit}
-      OFFSET ${offset}
+      WHERE to_tsvector('english', t.content) @@ plainto_tsquery('english', $1)
     `);
+  }
 
-    for (const row of transcriptionResults.rows) {
-      results.push({
-        type: "transcription",
+  if (unionParts.length === 0) {
+    res.json({ results: [], total: 0, query: q });
+    return;
+  }
+
+  const unionQuery = unionParts.join(" UNION ALL ");
+  const fullQuery = `
+    SELECT * FROM (${unionQuery}) combined
+    ORDER BY rank DESC
+    LIMIT $2
+    OFFSET $3
+  `;
+  const countQuery = `SELECT COUNT(*) as total FROM (${unionQuery}) combined`;
+
+  const client = await pool.connect();
+  try {
+    const [dataResult, countResult] = await Promise.all([
+      client.query(fullQuery, [q, limit, offset]),
+      client.query(countQuery, [q]),
+    ]);
+
+    res.json({
+      results: dataResult.rows.map((row: Record<string, unknown>) => ({
+        type: String(row.type),
         videoId: Number(row.videoId),
         videoTitle: String(row.videoTitle),
         timestampSec: Number(row.timestampSec),
-        endSec: row.endSec ? Number(row.endSec) : null,
+        endSec: row.endSec != null ? Number(row.endSec) : null,
         content: String(row.content),
-        imagePath: null,
+        imagePath: row.imagePath ? String(row.imagePath) : null,
         rank: Number(row.rank),
-      });
-    }
+      })),
+      total: Number(countResult.rows[0].total),
+      query: q,
+    });
+  } finally {
+    client.release();
   }
-
-  results.sort((a, b) => b.rank - a.rank);
-
-  res.json({
-    results: results.slice(0, limit),
-    total: results.length,
-    query: q,
-  });
 });
 
 export default router;

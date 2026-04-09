@@ -191,7 +191,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SearchResults"
 
-  /processing/status:
+  /processing-status:
     get:
       operationId: getProcessingStatus
       tags: [processing]

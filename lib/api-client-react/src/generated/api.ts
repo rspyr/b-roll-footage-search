@@ -756,7 +756,7 @@ export function useSearchContent<
  * @summary Get processing queue status overview
  */
 export const getGetProcessingStatusUrl = () => {
-  return `/api/processing/status`;
+  return `/api/processing-status`;
 };
 
 export const getProcessingStatus = async (
@@ -769,7 +769,7 @@ export const getProcessingStatus = async (
 };
 
 export const getGetProcessingStatusQueryKey = () => {
-  return [`/api/processing/status`] as const;
+  return [`/api/processing-status`] as const;
 };
 
 export const getGetProcessingStatusQueryOptions = <

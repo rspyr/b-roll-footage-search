@@ -4,7 +4,7 @@ import { db, videosTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
-router.get("/processing/status", async (_req, res): Promise<void> => {
+router.get("/processing-status", async (_req, res): Promise<void> => {
   const result = await db.execute(sql`
     SELECT
       COUNT(*) FILTER (WHERE status = 'pending') as pending,

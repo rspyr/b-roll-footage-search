@@ -172,7 +172,7 @@ export async function processVideo(videoId: number): Promise<void> {
 
     for (let i = 0; i < frameDescriptions.length; i++) {
       const { framePath, description } = frameDescriptions[i];
-      const relativePath = path.relative(DATA_DIR, framePath);
+      const relativePath = path.relative(FRAMES_DIR, framePath);
       await db.insert(framesTable).values({
         videoId,
         timestampSec: i * 5,
@@ -204,7 +204,7 @@ export async function processVideo(videoId: number): Promise<void> {
       logger.warn({ videoId, err }, "Audio extraction/transcription failed, continuing without transcription");
     }
 
-    const thumbnailPath = framePaths[0] ? path.relative(DATA_DIR, framePaths[0]) : null;
+    const thumbnailPath = framePaths[0] ? path.relative(FRAMES_DIR, framePaths[0]) : null;
     await db.update(videosTable).set({
       status: "completed",
       thumbnailPath,
