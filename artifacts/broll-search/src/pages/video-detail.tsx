@@ -2,10 +2,14 @@ import { useRoute, useSearch, Link } from "wouter";
 import {
   useGetVideo,
   getGetVideoQueryKey,
+  useProcessVideo,
   useUpdateFrameDescription,
   useAddManualFrame,
   useUpdateTranscriptionContent,
   useAddManualTranscription,
+  getGetProcessingStatusQueryKey,
+  getListVideosQueryKey,
+  getListFoldersQueryKey,
 } from "@workspace/api-client-react";
 import {
   Loader2,
@@ -19,6 +23,7 @@ import {
   Check,
   X,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import { formatDuration, formatBytes, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -104,6 +109,32 @@ export default function VideoDetail() {
   const invalidateVideo = () => {
     queryClient.invalidateQueries({ queryKey: getGetVideoQueryKey(id) });
   };
+
+  const invalidateAll = () => {
+    invalidateVideo();
+    queryClient.invalidateQueries({ queryKey: getGetProcessingStatusQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListVideosQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListFoldersQueryKey() });
+  };
+
+  const reprocessMutation = useProcessVideo({
+    mutation: {
+      onSuccess: () => {
+        toast({
+          title: "Processing Started",
+          description: "Video has been added to the processing queue.",
+        });
+        invalidateAll();
+      },
+      onError: () => {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to start video processing.",
+        });
+      },
+    },
+  });
 
   const updateFrameMutation = useUpdateFrameDescription({
     mutation: {
@@ -276,6 +307,19 @@ export default function VideoDetail() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={reprocessMutation.isPending || video.status === "processing"}
+                onClick={() => reprocessMutation.mutate({ id })}
+              >
+                {reprocessMutation.isPending ? (
+                  <Loader2 size={14} className="mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw size={14} className="mr-1" />
+                )}
+                {video.status === "completed" ? "Reprocess" : "Process"}
+              </Button>
               <Button asChild variant="outline" size="sm">
                 <a
                   href={driveUrl}
