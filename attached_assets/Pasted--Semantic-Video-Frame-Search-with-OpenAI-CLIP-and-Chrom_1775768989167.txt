@@ -1,0 +1,86 @@
+
+Semantic Video Frame Search with OpenAI CLIP and ChromaDB
+docs.vultr.com
+
+Implement Semantic Search for Video Content
+milvus.io
+
+SentrySearch: Semantic Search Over Videos
+github.com
+
+How to Integrate with Google Drive API via Python
+merge.dev
+
+Auto-Sync Drive: Python Google Drive Sync
+github.com
+
+How We Built Multimodal RAG for Audio and Video
+ragie.ai
+
+Beginner's Guide to Embedding Models
+learnopencv.com
+
+Serverless Semantic Search with Amazon Titan Embeddings
+aws.amazon.com
+Key Tools & Frameworks for Your B-Roll Search App
+Based on your requirements, here's a structured breakdown of the tech stack:
+
+Core Architecture Components
+1. Video Embeddings & Semantic Search
+OpenAI CLIP - Vision-language model for encoding video frames with text queries. Fast and widely used for semantic video search
+Google's VideoPoet or Meta's Timesformer - For temporal understanding of video sequences
+Alternative: LLaVA or smolVLM - Lightweight vision-language models for local inference
+2. Vector Databases
+Milvus - Open-source, highly performant for scale
+Weaviate - Built-in multimodal capabilities
+ChromaDB - Simple, lightweight, good for prototyping
+Qdrant - Fast and well-suited for production
+3. Google Drive Integration & Sync
+Google Drive API (Python client) - Official SDK for file operations
+Auto-Sync-Drive - Ready-made periodic sync script with task scheduling
+APScheduler or Celery - For scheduling the periodic sync checks
+4. Video Processing & Transcription
+FFmpeg - Frame extraction, format conversion
+OpenAI Whisper - Audio transcription with high accuracy; runs locally or via API
+AssemblyAI API - Cloud-based transcription alternative
+MoviePy - Python wrapper for FFmpeg, easier integration
+5. Backend & API
+FastAPI - Modern Python framework, async support for handling jobs
+Pydantic - Data validation
+Python-dotenv - Environment management for API keys
+6. Task Queue & Job Management
+Celery - Distributed task queue for async video processing
+Redis - Message broker for Celery; also useful for caching results
+Alternative: RQ (Redis Queue) - Simpler than Celery if you don't need advanced features
+From Your Saved Links:
+I found a couple of relevant resources in your bookmarks:
+
+i built an app to search old travel photos on my computer with natural language queries - Uses smolVLM, RF-DETR, and ChromaDB with Streamlit. Similar architecture to what you're building, useful reference.
+
+Multimodal AI just changed everything - Overview of processing multiple content types (video, audio, PDFs) in a single system.
+
+Recommended Full Stack:
+Frontend: React/Next.js (or simple Streamlit prototype)
+    ↓
+Backend: FastAPI (Python)
+    ↓
+Google Drive Integration: google-auth-oauthlib, google-api-python-client
+    ↓
+Job Queue: Celery + Redis
+    ↓
+Video Processing: FFmpeg + MoviePy
+    ↓
+Transcription: OpenAI Whisper (local) or AssemblyAI
+    ↓
+Embeddings: CLIP + Custom fine-tuning for b-roll
+    ↓
+Vector DB: Milvus or Weaviate
+    ↓
+Storage: Google Drive (source), Local/S3 (processed metadata & embeddings)
+MVP Implementation Path:
+Start with ChromaDB + CLIP for quick prototyping
+Add Google Drive API integration with APScheduler for periodic checks
+Implement FFmpeg frame extraction + Whisper transcription
+Build FastAPI endpoints for search and file retrieval
+Scale to Celery + Milvus once you need concurrent video processing
+Would you like me to search for specific implementation examples or documentation on any of these components?
