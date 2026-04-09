@@ -36,6 +36,9 @@ A semantic video search application that connects to Google Drive, processes vid
 - `GET /api/search?q=X&type=all|visual|audio` — Full-text search across frames and transcriptions
 - `GET /api/processing-status` — Processing queue overview
 - `GET /api/frames/*` — Static file serving for extracted frame images
+- `GET /api/folders` — List synced folders with video counts and status breakdown
+- `DELETE /api/folders/:folderId` — Remove a folder and all its videos, frames, transcriptions, and local files
+- `POST /api/folders/:folderId/sync` — Re-sync a folder to find new videos from Google Drive
 
 ### Processing Pipeline
 1. Download video from Google Drive
@@ -57,7 +60,7 @@ A semantic video search application that connects to Google Drive, processes vid
   - `/` — Home with search bar, processing status dashboard, recently processed videos
   - `/search?q=X` — Search results grid with type filters (All/Visual/Audio)
   - `/videos/:id` — Video detail with frame timeline and transcription segments
-  - `/library` — Video library with status badges and reprocessing controls
+  - `/library` — Folder-based video library with folder cards, status badges, remove/re-sync actions, and drill-down to folder videos
   - `/settings` — Google Drive folder browser and video sync
 
 ## Production Hardening

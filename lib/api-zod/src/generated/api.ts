@@ -208,3 +208,57 @@ export const GetProcessingStatusResponse = zod.object({
   failed: zod.number(),
   total: zod.number(),
 });
+
+/**
+ * @summary List synced folders with video counts and status breakdown
+ */
+export const ListFoldersResponseItem = zod.object({
+  driveFolderId: zod.string(),
+  name: zod.string(),
+  videoCount: zod.number(),
+  completedCount: zod.number(),
+  processingCount: zod.number(),
+  pendingCount: zod.number(),
+  failedCount: zod.number(),
+});
+export const ListFoldersResponse = zod.array(ListFoldersResponseItem);
+
+/**
+ * @summary Remove a folder and all its associated videos, frames, and transcriptions
+ */
+export const RemoveFolderParams = zod.object({
+  folderId: zod.coerce.string(),
+});
+
+export const RemoveFolderResponse = zod.object({
+  deletedCount: zod.number(),
+});
+
+/**
+ * @summary Re-sync a folder to find new videos from Google Drive
+ */
+export const ResyncFolderParams = zod.object({
+  folderId: zod.coerce.string(),
+});
+
+export const ResyncFolderResponse = zod.object({
+  newVideoCount: zod.number(),
+  totalInDrive: zod.number(),
+  videos: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      driveFileId: zod.string(),
+      driveFolderId: zod.string().nullish(),
+      mimeType: zod.string(),
+      fileSize: zod.number().nullish(),
+      duration: zod.number().nullish(),
+      localPath: zod.string().nullish(),
+      thumbnailPath: zod.string().nullish(),
+      status: zod.enum(["pending", "processing", "completed", "failed"]),
+      processingError: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});

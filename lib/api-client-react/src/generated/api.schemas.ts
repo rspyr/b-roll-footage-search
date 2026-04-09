@@ -147,6 +147,26 @@ export interface ProcessingStatus {
   total: number;
 }
 
+export interface SyncedFolder {
+  driveFolderId: string;
+  name: string;
+  videoCount: number;
+  completedCount: number;
+  processingCount: number;
+  pendingCount: number;
+  failedCount: number;
+}
+
+export interface FolderDeleteResult {
+  deletedCount: number;
+}
+
+export interface FolderResyncResult {
+  newVideoCount: number;
+  totalInDrive: number;
+  videos: Video[];
+}
+
 export type ListVideosParams = {
   status?: ListVideosStatus;
 };

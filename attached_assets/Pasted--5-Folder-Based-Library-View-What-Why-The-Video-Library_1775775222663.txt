@@ -1,0 +1,32 @@
+#5 - Folder-Based Library View
+What & Why
+The Video Library currently shows a flat list of all 129+ videos, making it hard to organize and manage. Instead, show the synced Google Drive folders as the primary view, with video counts and status summaries per folder. Add the ability to remove a folder (and all its videos) from the app, and a re-sync button to fetch any new videos added to a folder since the last sync.
+
+Done looks like
+The Library page shows folder cards instead of a flat video list — each card displays the folder name, video count, and a status summary (completed/pending/processing counts)
+Clicking a folder expands or navigates to show that folder's videos
+Each folder has a "Remove" action that deletes the folder and all its associated videos, frames, transcriptions, and local files from the app
+Each folder has a "Re-sync" action that re-checks Google Drive for any new videos in that folder and adds them
+The status overview cards at the top still work as before
+Out of scope
+Nested subfolder support (only top-level synced folders)
+Renaming folders
+Moving videos between folders
+Tasks
+New API endpoint to list synced folders — Add GET /api/folders that queries the videos table, groups by driveFolderId, and returns folder metadata (ID, name, video count, status breakdown). Fetch folder names from Google Drive API.
+
+New API endpoint to remove a folder — Add DELETE /api/folders/:folderId that deletes all videos, frames, transcriptions, and local files associated with that driveFolderId.
+
+New API endpoint to re-sync a folder — Add POST /api/folders/:folderId/sync that re-checks Google Drive for new videos in that folder and adds any that aren't already in the database, then starts processing.
+
+Update OpenAPI spec and regenerate API client — Add the three new endpoints and schemas to openapi.yaml, run codegen to generate React Query hooks.
+
+Rewrite the Library page — Replace the flat video table with a folder-based view showing folder cards. Each card shows folder name, video count, and status summary. Add dropdown actions for "Remove" and "Re-sync" per folder. Clicking a folder shows its videos in a sub-view or expandable section.
+
+Relevant files
+artifacts/broll-search/src/pages/library.tsx
+artifacts/api-server/src/routes/videos/index.ts
+lib/db/src/schema/videos.ts
+lib/api-spec/openapi.yaml
+artifacts/api-server/src/lib/google-drive.ts
+artifacts/api-server/src/lib/video-processor.ts

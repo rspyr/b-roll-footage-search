@@ -18,6 +18,8 @@ tags:
     description: Google Drive operations
   - name: processing
     description: Processing status
+  - name: folders
+    description: Synced folder management
 paths:
   /healthz:
     get:
@@ -224,6 +226,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProcessingStatus"
+
+  /folders:
+    get:
+      operationId: listFolders
+      tags: [folders]
+      summary: List synced folders with video counts and status breakdown
+      responses:
+        "200":
+          description: List of synced folders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SyncedFolder"
+
+  /folders/{folderId}:
+    delete:
+      operationId: removeFolder
+      tags: [folders]
+      summary: Remove a folder and all its associated videos, frames, and transcriptions
+      parameters:
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Folder removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FolderDeleteResult"
+        "404":
+          description: Folder not found
+
+  /folders/{folderId}/sync:
+    post:
+      operationId: resyncFolder
+      tags: [folders]
+      summary: Re-sync a folder to find new videos from Google Drive
+      parameters:
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Re-sync results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FolderResyncResult"
 
 components:
   schemas:
@@ -501,3 +558,53 @@ components:
         - completed
         - failed
         - total
+
+    SyncedFolder:
+      type: object
+      properties:
+        driveFolderId:
+          type: string
+        name:
+          type: string
+        videoCount:
+          type: integer
+        completedCount:
+          type: integer
+        processingCount:
+          type: integer
+        pendingCount:
+          type: integer
+        failedCount:
+          type: integer
+      required:
+        - driveFolderId
+        - name
+        - videoCount
+        - completedCount
+        - processingCount
+        - pendingCount
+        - failedCount
+
+    FolderDeleteResult:
+      type: object
+      properties:
+        deletedCount:
+          type: integer
+      required:
+        - deletedCount
+
+    FolderResyncResult:
+      type: object
+      properties:
+        newVideoCount:
+          type: integer
+        totalInDrive:
+          type: integer
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Video"
+      required:
+        - newVideoCount
+        - totalInDrive
+        - videos

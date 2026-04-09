@@ -19,6 +19,8 @@ import type {
 import type {
   DriveFile,
   DriveFolder,
+  FolderDeleteResult,
+  FolderResyncResult,
   HealthStatus,
   ListDriveFilesParams,
   ListDriveFoldersParams,
@@ -29,6 +31,7 @@ import type {
   SearchResults,
   SyncRequest,
   SyncResponse,
+  SyncedFolder,
   Video,
   VideoDetail,
 } from "./api.schemas";
@@ -915,3 +918,246 @@ export function useGetProcessingStatus<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List synced folders with video counts and status breakdown
+ */
+export const getListFoldersUrl = () => {
+  return `/api/folders`;
+};
+
+export const listFolders = async (
+  options?: RequestInit,
+): Promise<SyncedFolder[]> => {
+  return customFetch<SyncedFolder[]>(getListFoldersUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListFoldersQueryKey = () => {
+  return [`/api/folders`] as const;
+};
+
+export const getListFoldersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFolders>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFolders>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListFoldersQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFolders>>> = ({
+    signal,
+  }) => listFolders({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFolders>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFoldersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFolders>>
+>;
+export type ListFoldersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List synced folders with video counts and status breakdown
+ */
+
+export function useListFolders<
+  TData = Awaited<ReturnType<typeof listFolders>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFolders>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFoldersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Remove a folder and all its associated videos, frames, and transcriptions
+ */
+export const getRemoveFolderUrl = (folderId: string) => {
+  return `/api/folders/${folderId}`;
+};
+
+export const removeFolder = async (
+  folderId: string,
+  options?: RequestInit,
+): Promise<FolderDeleteResult> => {
+  return customFetch<FolderDeleteResult>(getRemoveFolderUrl(folderId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getRemoveFolderMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeFolder>>,
+    TError,
+    { folderId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeFolder>>,
+  TError,
+  { folderId: string },
+  TContext
+> => {
+  const mutationKey = ["removeFolder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeFolder>>,
+    { folderId: string }
+  > = (props) => {
+    const { folderId } = props ?? {};
+
+    return removeFolder(folderId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoveFolderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removeFolder>>
+>;
+
+export type RemoveFolderMutationError = ErrorType<void>;
+
+/**
+ * @summary Remove a folder and all its associated videos, frames, and transcriptions
+ */
+export const useRemoveFolder = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeFolder>>,
+    TError,
+    { folderId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removeFolder>>,
+  TError,
+  { folderId: string },
+  TContext
+> => {
+  return useMutation(getRemoveFolderMutationOptions(options));
+};
+
+/**
+ * @summary Re-sync a folder to find new videos from Google Drive
+ */
+export const getResyncFolderUrl = (folderId: string) => {
+  return `/api/folders/${folderId}/sync`;
+};
+
+export const resyncFolder = async (
+  folderId: string,
+  options?: RequestInit,
+): Promise<FolderResyncResult> => {
+  return customFetch<FolderResyncResult>(getResyncFolderUrl(folderId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getResyncFolderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resyncFolder>>,
+    TError,
+    { folderId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resyncFolder>>,
+  TError,
+  { folderId: string },
+  TContext
+> => {
+  const mutationKey = ["resyncFolder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resyncFolder>>,
+    { folderId: string }
+  > = (props) => {
+    const { folderId } = props ?? {};
+
+    return resyncFolder(folderId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResyncFolderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resyncFolder>>
+>;
+
+export type ResyncFolderMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Re-sync a folder to find new videos from Google Drive
+ */
+export const useResyncFolder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resyncFolder>>,
+    TError,
+    { folderId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resyncFolder>>,
+  TError,
+  { folderId: string },
+  TContext
+> => {
+  return useMutation(getResyncFolderMutationOptions(options));
+};

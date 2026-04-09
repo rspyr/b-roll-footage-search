@@ -8,6 +8,8 @@
 
 export * from "./driveFile";
 export * from "./driveFolder";
+export * from "./folderDeleteResult";
+export * from "./folderResyncResult";
 export * from "./frameItem";
 export * from "./healthStatus";
 export * from "./listDriveFilesParams";
@@ -21,6 +23,7 @@ export * from "./searchContentType";
 export * from "./searchResult";
 export * from "./searchResults";
 export * from "./searchResultType";
+export * from "./syncedFolder";
 export * from "./syncRequest";
 export * from "./syncResponse";
 export * from "./transcriptionItem";
