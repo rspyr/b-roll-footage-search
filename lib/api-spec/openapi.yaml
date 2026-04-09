@@ -37,13 +37,13 @@ paths:
     get:
       operationId: listVideos
       tags: [videos]
-      summary: List all synced videos
+      summary: List all videos
       parameters:
         - name: status
           in: query
           schema:
             type: string
-            enum: [pending, synced, processing, completed, failed]
+            enum: [pending, processing, completed, failed]
       responses:
         "200":
           description: List of videos
@@ -237,7 +237,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          enum: [pending, synced, processing, completed, failed]
+          enum: [pending, processing, completed, failed]
         processingError:
           type: ["string", "null"]
         createdAt:
@@ -466,8 +466,6 @@ components:
       properties:
         pending:
           type: integer
-        synced:
-          type: integer
         processing:
           type: integer
         completed:
@@ -478,7 +476,6 @@ components:
           type: integer
       required:
         - pending
-        - synced
         - processing
         - completed
         - failed

@@ -10,7 +10,6 @@ export type VideoStatus = (typeof VideoStatus)[keyof typeof VideoStatus];
 
 export const VideoStatus = {
   pending: "pending",
-  synced: "synced",
   processing: "processing",
   completed: "completed",
   failed: "failed",

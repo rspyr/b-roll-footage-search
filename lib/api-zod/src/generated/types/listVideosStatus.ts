@@ -11,7 +11,6 @@ export type ListVideosStatus =
 
 export const ListVideosStatus = {
   pending: "pending",
-  synced: "synced",
   processing: "processing",
   completed: "completed",
   failed: "failed",

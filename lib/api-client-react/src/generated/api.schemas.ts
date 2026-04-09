@@ -13,7 +13,6 @@ export type VideoStatus = (typeof VideoStatus)[keyof typeof VideoStatus];
 
 export const VideoStatus = {
   pending: "pending",
-  synced: "synced",
   processing: "processing",
   completed: "completed",
   failed: "failed",
@@ -142,7 +141,6 @@ export interface ProcessingResponse {
 
 export interface ProcessingStatus {
   pending: number;
-  synced: number;
   processing: number;
   completed: number;
   failed: number;
@@ -158,7 +156,6 @@ export type ListVideosStatus =
 
 export const ListVideosStatus = {
   pending: "pending",
-  synced: "synced",
   processing: "processing",
   completed: "completed",
   failed: "failed",

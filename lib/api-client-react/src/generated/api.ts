@@ -119,7 +119,7 @@ export function useHealthCheck<
 }
 
 /**
- * @summary List all synced videos
+ * @summary List all videos
  */
 export const getListVideosUrl = (params?: ListVideosParams) => {
   const normalizedParams = new URLSearchParams();
@@ -186,7 +186,7 @@ export type ListVideosQueryResult = NonNullable<
 export type ListVideosQueryError = ErrorType<unknown>;
 
 /**
- * @summary List all synced videos
+ * @summary List all videos
  */
 
 export function useListVideos<

@@ -8,7 +8,6 @@
 
 export interface ProcessingStatus {
   pending: number;
-  synced: number;
   processing: number;
   completed: number;
   failed: number;

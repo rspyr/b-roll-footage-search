@@ -16,12 +16,10 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * @summary List all synced videos
+ * @summary List all videos
  */
 export const ListVideosQueryParams = zod.object({
-  status: zod
-    .enum(["pending", "synced", "processing", "completed", "failed"])
-    .optional(),
+  status: zod.enum(["pending", "processing", "completed", "failed"]).optional(),
 });
 
 export const ListVideosResponseItem = zod.object({
@@ -34,7 +32,7 @@ export const ListVideosResponseItem = zod.object({
   duration: zod.number().nullish(),
   localPath: zod.string().nullish(),
   thumbnailPath: zod.string().nullish(),
-  status: zod.enum(["pending", "synced", "processing", "completed", "failed"]),
+  status: zod.enum(["pending", "processing", "completed", "failed"]),
   processingError: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -117,13 +115,7 @@ export const SyncVideosResponse = zod.object({
       duration: zod.number().nullish(),
       localPath: zod.string().nullish(),
       thumbnailPath: zod.string().nullish(),
-      status: zod.enum([
-        "pending",
-        "synced",
-        "processing",
-        "completed",
-        "failed",
-      ]),
+      status: zod.enum(["pending", "processing", "completed", "failed"]),
       processingError: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -198,7 +190,6 @@ export const SearchContentResponse = zod.object({
  */
 export const GetProcessingStatusResponse = zod.object({
   pending: zod.number(),
-  synced: zod.number(),
   processing: zod.number(),
   completed: zod.number(),
   failed: zod.number(),
