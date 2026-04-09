@@ -17,7 +17,7 @@ export default function Home() {
       refetchInterval: (query) => {
         const d = query.state.data;
         if (d && ((d.pending ?? 0) > 0 || (d.processing ?? 0) > 0)) return 3000;
-        return false;
+        return 30000;
       },
     },
   });
@@ -27,7 +27,7 @@ export default function Home() {
   const { data: videos, isLoading } = useListVideos({ status: "completed" }, {
     query: {
       queryKey: getListVideosQueryKey({ status: "completed" }),
-      refetchInterval: hasActiveProcessing ? 5000 : false,
+      refetchInterval: hasActiveProcessing ? 5000 : 30000,
     },
   });
 

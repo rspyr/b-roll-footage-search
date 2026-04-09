@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { useListVideos, useProcessVideo, useGetProcessingStatus } from "@workspace/api-client-react";
+import { useListVideos, useProcessVideo, useGetProcessingStatus, getListVideosQueryKey, getGetProcessingStatusQueryKey } from "@workspace/api-client-react";
 import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Clock, MoreVertical, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { formatDuration, formatBytes, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { getListVideosQueryKey, getGetProcessingStatusQueryKey } from "@workspace/api-client-react";
 
 export default function Library() {
   const [, setLocation] = useLocation();
@@ -21,7 +20,7 @@ export default function Library() {
       refetchInterval: (query) => {
         const d = query.state.data;
         if (d && ((d.pending ?? 0) > 0 || (d.processing ?? 0) > 0)) return 3000;
-        return false;
+        return 30000;
       },
     },
   });
@@ -31,7 +30,7 @@ export default function Library() {
   const { data: videos, isLoading } = useListVideos(undefined, {
     query: {
       queryKey: getListVideosQueryKey(),
-      refetchInterval: hasActiveProcessing ? 5000 : false,
+      refetchInterval: hasActiveProcessing ? 5000 : 30000,
     },
   });
   
