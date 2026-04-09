@@ -68,8 +68,8 @@ async function ensureVideoSegmentsTable() {
     CREATE TABLE IF NOT EXISTS video_segments (
       id SERIAL PRIMARY KEY,
       video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
-      start_sec DOUBLE PRECISION NOT NULL DEFAULT 0,
-      end_sec DOUBLE PRECISION,
+      start_sec REAL NOT NULL DEFAULT 0,
+      end_sec REAL NOT NULL DEFAULT 0,
       embedding vector(768),
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
     );
