@@ -14,3 +14,193 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary List all synced videos
+ */
+export const ListVideosQueryParams = zod.object({
+  status: zod
+    .enum(["pending", "synced", "processing", "completed", "failed"])
+    .optional(),
+});
+
+export const ListVideosResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  driveFileId: zod.string(),
+  driveFolderId: zod.string().nullish(),
+  mimeType: zod.string(),
+  fileSize: zod.number().nullish(),
+  duration: zod.number().nullish(),
+  localPath: zod.string().nullish(),
+  thumbnailPath: zod.string().nullish(),
+  status: zod.enum(["pending", "synced", "processing", "completed", "failed"]),
+  processingError: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListVideosResponse = zod.array(ListVideosResponseItem);
+
+/**
+ * @summary Get video details with frames and transcriptions
+ */
+export const GetVideoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetVideoResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  driveFileId: zod.string(),
+  driveFolderId: zod.string().nullish(),
+  mimeType: zod.string(),
+  fileSize: zod.number().nullish(),
+  duration: zod.number().nullish(),
+  localPath: zod.string().nullish(),
+  thumbnailPath: zod.string().nullish(),
+  status: zod.string(),
+  processingError: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  frames: zod.array(
+    zod.object({
+      id: zod.number(),
+      videoId: zod.number(),
+      timestampSec: zod.number(),
+      imagePath: zod.string(),
+      description: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  transcriptions: zod.array(
+    zod.object({
+      id: zod.number(),
+      videoId: zod.number(),
+      startSec: zod.number(),
+      endSec: zod.number(),
+      content: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Trigger video processing
+ */
+export const ProcessVideoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ProcessVideoResponse = zod.object({
+  message: zod.string(),
+  videoId: zod.number(),
+  status: zod.string(),
+});
+
+/**
+ * @summary Sync videos from a Google Drive folder
+ */
+export const SyncVideosBody = zod.object({
+  folderId: zod.string(),
+});
+
+export const SyncVideosResponse = zod.object({
+  syncedCount: zod.number(),
+  videos: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      driveFileId: zod.string(),
+      driveFolderId: zod.string().nullish(),
+      mimeType: zod.string(),
+      fileSize: zod.number().nullish(),
+      duration: zod.number().nullish(),
+      localPath: zod.string().nullish(),
+      thumbnailPath: zod.string().nullish(),
+      status: zod.enum([
+        "pending",
+        "synced",
+        "processing",
+        "completed",
+        "failed",
+      ]),
+      processingError: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary List Google Drive folders
+ */
+export const ListDriveFoldersQueryParams = zod.object({
+  parentId: zod.coerce.string().optional(),
+});
+
+export const ListDriveFoldersResponseItem = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  mimeType: zod.string(),
+});
+export const ListDriveFoldersResponse = zod.array(ListDriveFoldersResponseItem);
+
+/**
+ * @summary List video files in a Google Drive folder
+ */
+export const ListDriveFilesQueryParams = zod.object({
+  folderId: zod.coerce.string(),
+});
+
+export const ListDriveFilesResponseItem = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  mimeType: zod.string(),
+  size: zod.string().nullish(),
+});
+export const ListDriveFilesResponse = zod.array(ListDriveFilesResponseItem);
+
+/**
+ * @summary Search across video frames and transcriptions
+ */
+export const searchContentQueryTypeDefault = `all`;
+export const searchContentQueryLimitDefault = 20;
+export const searchContentQueryOffsetDefault = 0;
+
+export const SearchContentQueryParams = zod.object({
+  q: zod.coerce.string(),
+  type: zod
+    .enum(["all", "visual", "audio"])
+    .default(searchContentQueryTypeDefault),
+  limit: zod.coerce.number().default(searchContentQueryLimitDefault),
+  offset: zod.coerce.number().default(searchContentQueryOffsetDefault),
+});
+
+export const SearchContentResponse = zod.object({
+  results: zod.array(
+    zod.object({
+      type: zod.enum(["frame", "transcription"]),
+      videoId: zod.number(),
+      videoTitle: zod.string(),
+      timestampSec: zod.number(),
+      endSec: zod.number().nullish(),
+      content: zod.string(),
+      imagePath: zod.string().nullish(),
+      rank: zod.number(),
+    }),
+  ),
+  total: zod.number(),
+  query: zod.string(),
+});
+
+/**
+ * @summary Get processing queue status overview
+ */
+export const GetProcessingStatusResponse = zod.object({
+  pending: zod.number(),
+  synced: zod.number(),
+  processing: zod.number(),
+  completed: zod.number(),
+  failed: zod.number(),
+  total: zod.number(),
+});

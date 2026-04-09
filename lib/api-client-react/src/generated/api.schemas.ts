@@ -8,3 +8,182 @@
 export interface HealthStatus {
   status: string;
 }
+
+export type VideoStatus = (typeof VideoStatus)[keyof typeof VideoStatus];
+
+export const VideoStatus = {
+  pending: "pending",
+  synced: "synced",
+  processing: "processing",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export interface Video {
+  id: number;
+  title: string;
+  driveFileId: string;
+  /** @nullable */
+  driveFolderId?: string | null;
+  mimeType: string;
+  /** @nullable */
+  fileSize?: number | null;
+  /** @nullable */
+  duration?: number | null;
+  /** @nullable */
+  localPath?: string | null;
+  /** @nullable */
+  thumbnailPath?: string | null;
+  status: VideoStatus;
+  /** @nullable */
+  processingError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FrameItem {
+  id: number;
+  videoId: number;
+  timestampSec: number;
+  imagePath: string;
+  /** @nullable */
+  description?: string | null;
+  createdAt: string;
+}
+
+export interface TranscriptionItem {
+  id: number;
+  videoId: number;
+  startSec: number;
+  endSec: number;
+  content: string;
+  createdAt: string;
+}
+
+export interface VideoDetail {
+  id: number;
+  title: string;
+  driveFileId: string;
+  /** @nullable */
+  driveFolderId?: string | null;
+  mimeType: string;
+  /** @nullable */
+  fileSize?: number | null;
+  /** @nullable */
+  duration?: number | null;
+  /** @nullable */
+  localPath?: string | null;
+  /** @nullable */
+  thumbnailPath?: string | null;
+  status: string;
+  /** @nullable */
+  processingError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  frames: FrameItem[];
+  transcriptions: TranscriptionItem[];
+}
+
+export interface SyncRequest {
+  folderId: string;
+}
+
+export interface SyncResponse {
+  syncedCount: number;
+  videos: Video[];
+}
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+  mimeType: string;
+}
+
+export interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  /** @nullable */
+  size?: string | null;
+}
+
+export type SearchResultType =
+  (typeof SearchResultType)[keyof typeof SearchResultType];
+
+export const SearchResultType = {
+  frame: "frame",
+  transcription: "transcription",
+} as const;
+
+export interface SearchResult {
+  type: SearchResultType;
+  videoId: number;
+  videoTitle: string;
+  timestampSec: number;
+  /** @nullable */
+  endSec?: number | null;
+  content: string;
+  /** @nullable */
+  imagePath?: string | null;
+  rank: number;
+}
+
+export interface SearchResults {
+  results: SearchResult[];
+  total: number;
+  query: string;
+}
+
+export interface ProcessingResponse {
+  message: string;
+  videoId: number;
+  status: string;
+}
+
+export interface ProcessingStatus {
+  pending: number;
+  synced: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  total: number;
+}
+
+export type ListVideosParams = {
+  status?: ListVideosStatus;
+};
+
+export type ListVideosStatus =
+  (typeof ListVideosStatus)[keyof typeof ListVideosStatus];
+
+export const ListVideosStatus = {
+  pending: "pending",
+  synced: "synced",
+  processing: "processing",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export type ListDriveFoldersParams = {
+  parentId?: string;
+};
+
+export type ListDriveFilesParams = {
+  folderId: string;
+};
+
+export type SearchContentParams = {
+  q: string;
+  type?: SearchContentType;
+  limit?: number;
+  offset?: number;
+};
+
+export type SearchContentType =
+  (typeof SearchContentType)[keyof typeof SearchContentType];
+
+export const SearchContentType = {
+  all: "all",
+  visual: "visual",
+  audio: "audio",
+} as const;

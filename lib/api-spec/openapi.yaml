@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: videos
+    description: Video management
+  - name: search
+    description: Search operations
+  - name: drive
+    description: Google Drive operations
+  - name: processing
+    description: Processing status
 paths:
   /healthz:
     get:
@@ -24,6 +32,178 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /videos:
+    get:
+      operationId: listVideos
+      tags: [videos]
+      summary: List all synced videos
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, synced, processing, completed, failed]
+      responses:
+        "200":
+          description: List of videos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Video"
+
+  /videos/{id}:
+    get:
+      operationId: getVideo
+      tags: [videos]
+      summary: Get video details with frames and transcriptions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Video details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoDetail"
+        "404":
+          description: Video not found
+
+  /videos/{id}/process:
+    post:
+      operationId: processVideo
+      tags: [videos]
+      summary: Trigger video processing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Processing started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessingResponse"
+        "404":
+          description: Video not found
+
+  /videos/sync:
+    post:
+      operationId: syncVideos
+      tags: [drive]
+      summary: Sync videos from a Google Drive folder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncRequest"
+      responses:
+        "200":
+          description: Sync initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResponse"
+
+  /drive/folders:
+    get:
+      operationId: listDriveFolders
+      tags: [drive]
+      summary: List Google Drive folders
+      parameters:
+        - name: parentId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of folders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DriveFolder"
+
+  /drive/files:
+    get:
+      operationId: listDriveFiles
+      tags: [drive]
+      summary: List video files in a Google Drive folder
+      parameters:
+        - name: folderId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of video files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DriveFile"
+
+  /search:
+    get:
+      operationId: searchContent
+      tags: [search]
+      summary: Search across video frames and transcriptions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, visual, audio]
+            default: all
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResults"
+
+  /processing/status:
+    get:
+      operationId: getProcessingStatus
+      tags: [processing]
+      summary: Get processing queue status overview
+      responses:
+        "200":
+          description: Processing status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessingStatus"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +214,272 @@ components:
       required:
         - status
 
+    Video:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        driveFileId:
+          type: string
+        driveFolderId:
+          type: ["string", "null"]
+        mimeType:
+          type: string
+        fileSize:
+          type: ["integer", "null"]
+        duration:
+          type: ["integer", "null"]
+        localPath:
+          type: ["string", "null"]
+        thumbnailPath:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, synced, processing, completed, failed]
+        processingError:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - driveFileId
+        - mimeType
+        - status
+        - createdAt
+        - updatedAt
+
+    VideoDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        driveFileId:
+          type: string
+        driveFolderId:
+          type: ["string", "null"]
+        mimeType:
+          type: string
+        fileSize:
+          type: ["integer", "null"]
+        duration:
+          type: ["integer", "null"]
+        localPath:
+          type: ["string", "null"]
+        thumbnailPath:
+          type: ["string", "null"]
+        status:
+          type: string
+        processingError:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        frames:
+          type: array
+          items:
+            $ref: "#/components/schemas/FrameItem"
+        transcriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranscriptionItem"
+      required:
+        - id
+        - title
+        - driveFileId
+        - mimeType
+        - status
+        - createdAt
+        - updatedAt
+        - frames
+        - transcriptions
+
+    FrameItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        videoId:
+          type: integer
+        timestampSec:
+          type: number
+        imagePath:
+          type: string
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - videoId
+        - timestampSec
+        - imagePath
+        - createdAt
+
+    TranscriptionItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        videoId:
+          type: integer
+        startSec:
+          type: number
+        endSec:
+          type: number
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - videoId
+        - startSec
+        - endSec
+        - content
+        - createdAt
+
+    SyncRequest:
+      type: object
+      properties:
+        folderId:
+          type: string
+      required:
+        - folderId
+
+    SyncResponse:
+      type: object
+      properties:
+        syncedCount:
+          type: integer
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Video"
+      required:
+        - syncedCount
+        - videos
+
+    DriveFolder:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        mimeType:
+          type: string
+      required:
+        - id
+        - name
+        - mimeType
+
+    DriveFile:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: ["string", "null"]
+      required:
+        - id
+        - name
+        - mimeType
+
+    SearchResults:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+        total:
+          type: integer
+        query:
+          type: string
+      required:
+        - results
+        - total
+        - query
+
+    SearchResult:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [frame, transcription]
+        videoId:
+          type: integer
+        videoTitle:
+          type: string
+        timestampSec:
+          type: number
+        endSec:
+          type: ["number", "null"]
+        content:
+          type: string
+        imagePath:
+          type: ["string", "null"]
+        rank:
+          type: number
+      required:
+        - type
+        - videoId
+        - videoTitle
+        - timestampSec
+        - content
+        - rank
+
+    ProcessingResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        videoId:
+          type: integer
+        status:
+          type: string
+      required:
+        - message
+        - videoId
+        - status
+
+    ProcessingStatus:
+      type: object
+      properties:
+        pending:
+          type: integer
+        synced:
+          type: integer
+        processing:
+          type: integer
+        completed:
+          type: integer
+        failed:
+          type: integer
+        total:
+          type: integer
+      required:
+        - pending
+        - synced
+        - processing
+        - completed
+        - failed
+        - total

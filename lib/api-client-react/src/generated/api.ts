@@ -5,18 +5,36 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  DriveFile,
+  DriveFolder,
+  HealthStatus,
+  ListDriveFilesParams,
+  ListDriveFoldersParams,
+  ListVideosParams,
+  ProcessingResponse,
+  ProcessingStatus,
+  SearchContentParams,
+  SearchResults,
+  SyncRequest,
+  SyncResponse,
+  Video,
+  VideoDetail,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -92,6 +110,715 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all synced videos
+ */
+export const getListVideosUrl = (params?: ListVideosParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/videos?${stringifiedParams}`
+    : `/api/videos`;
+};
+
+export const listVideos = async (
+  params?: ListVideosParams,
+  options?: RequestInit,
+): Promise<Video[]> => {
+  return customFetch<Video[]>(getListVideosUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListVideosQueryKey = (params?: ListVideosParams) => {
+  return [`/api/videos`, ...(params ? [params] : [])] as const;
+};
+
+export const getListVideosQueryOptions = <
+  TData = Awaited<ReturnType<typeof listVideos>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListVideosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVideos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListVideosQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideos>>> = ({
+    signal,
+  }) => listVideos(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listVideos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListVideosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listVideos>>
+>;
+export type ListVideosQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all synced videos
+ */
+
+export function useListVideos<
+  TData = Awaited<ReturnType<typeof listVideos>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListVideosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listVideos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListVideosQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get video details with frames and transcriptions
+ */
+export const getGetVideoUrl = (id: number) => {
+  return `/api/videos/${id}`;
+};
+
+export const getVideo = async (
+  id: number,
+  options?: RequestInit,
+): Promise<VideoDetail> => {
+  return customFetch<VideoDetail>(getGetVideoUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVideoQueryKey = (id: number) => {
+  return [`/api/videos/${id}`] as const;
+};
+
+export const getGetVideoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVideo>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVideo>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetVideoQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideo>>> = ({
+    signal,
+  }) => getVideo(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getVideo>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetVideoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVideo>>
+>;
+export type GetVideoQueryError = ErrorType<void>;
+
+/**
+ * @summary Get video details with frames and transcriptions
+ */
+
+export function useGetVideo<
+  TData = Awaited<ReturnType<typeof getVideo>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVideo>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVideoQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Trigger video processing
+ */
+export const getProcessVideoUrl = (id: number) => {
+  return `/api/videos/${id}/process`;
+};
+
+export const processVideo = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ProcessingResponse> => {
+  return customFetch<ProcessingResponse>(getProcessVideoUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getProcessVideoMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof processVideo>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof processVideo>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["processVideo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof processVideo>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return processVideo(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProcessVideoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof processVideo>>
+>;
+
+export type ProcessVideoMutationError = ErrorType<void>;
+
+/**
+ * @summary Trigger video processing
+ */
+export const useProcessVideo = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof processVideo>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof processVideo>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getProcessVideoMutationOptions(options));
+};
+
+/**
+ * @summary Sync videos from a Google Drive folder
+ */
+export const getSyncVideosUrl = () => {
+  return `/api/videos/sync`;
+};
+
+export const syncVideos = async (
+  syncRequest: SyncRequest,
+  options?: RequestInit,
+): Promise<SyncResponse> => {
+  return customFetch<SyncResponse>(getSyncVideosUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(syncRequest),
+  });
+};
+
+export const getSyncVideosMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof syncVideos>>,
+    TError,
+    { data: BodyType<SyncRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof syncVideos>>,
+  TError,
+  { data: BodyType<SyncRequest> },
+  TContext
+> => {
+  const mutationKey = ["syncVideos"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof syncVideos>>,
+    { data: BodyType<SyncRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return syncVideos(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SyncVideosMutationResult = NonNullable<
+  Awaited<ReturnType<typeof syncVideos>>
+>;
+export type SyncVideosMutationBody = BodyType<SyncRequest>;
+export type SyncVideosMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Sync videos from a Google Drive folder
+ */
+export const useSyncVideos = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof syncVideos>>,
+    TError,
+    { data: BodyType<SyncRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof syncVideos>>,
+  TError,
+  { data: BodyType<SyncRequest> },
+  TContext
+> => {
+  return useMutation(getSyncVideosMutationOptions(options));
+};
+
+/**
+ * @summary List Google Drive folders
+ */
+export const getListDriveFoldersUrl = (params?: ListDriveFoldersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/drive/folders?${stringifiedParams}`
+    : `/api/drive/folders`;
+};
+
+export const listDriveFolders = async (
+  params?: ListDriveFoldersParams,
+  options?: RequestInit,
+): Promise<DriveFolder[]> => {
+  return customFetch<DriveFolder[]>(getListDriveFoldersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDriveFoldersQueryKey = (
+  params?: ListDriveFoldersParams,
+) => {
+  return [`/api/drive/folders`, ...(params ? [params] : [])] as const;
+};
+
+export const getListDriveFoldersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDriveFolders>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListDriveFoldersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDriveFolders>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDriveFoldersQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDriveFolders>>
+  > = ({ signal }) => listDriveFolders(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDriveFolders>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDriveFoldersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDriveFolders>>
+>;
+export type ListDriveFoldersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List Google Drive folders
+ */
+
+export function useListDriveFolders<
+  TData = Awaited<ReturnType<typeof listDriveFolders>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListDriveFoldersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDriveFolders>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDriveFoldersQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List video files in a Google Drive folder
+ */
+export const getListDriveFilesUrl = (params: ListDriveFilesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/drive/files?${stringifiedParams}`
+    : `/api/drive/files`;
+};
+
+export const listDriveFiles = async (
+  params: ListDriveFilesParams,
+  options?: RequestInit,
+): Promise<DriveFile[]> => {
+  return customFetch<DriveFile[]>(getListDriveFilesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDriveFilesQueryKey = (params?: ListDriveFilesParams) => {
+  return [`/api/drive/files`, ...(params ? [params] : [])] as const;
+};
+
+export const getListDriveFilesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDriveFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListDriveFilesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDriveFiles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListDriveFilesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listDriveFiles>>> = ({
+    signal,
+  }) => listDriveFiles(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDriveFiles>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDriveFilesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDriveFiles>>
+>;
+export type ListDriveFilesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List video files in a Google Drive folder
+ */
+
+export function useListDriveFiles<
+  TData = Awaited<ReturnType<typeof listDriveFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListDriveFilesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDriveFiles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDriveFilesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Search across video frames and transcriptions
+ */
+export const getSearchContentUrl = (params: SearchContentParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/search?${stringifiedParams}`
+    : `/api/search`;
+};
+
+export const searchContent = async (
+  params: SearchContentParams,
+  options?: RequestInit,
+): Promise<SearchResults> => {
+  return customFetch<SearchResults>(getSearchContentUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getSearchContentQueryKey = (params?: SearchContentParams) => {
+  return [`/api/search`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchContentQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchContent>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchContentParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchContent>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSearchContentQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchContent>>> = ({
+    signal,
+  }) => searchContent(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchContent>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SearchContentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchContent>>
+>;
+export type SearchContentQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Search across video frames and transcriptions
+ */
+
+export function useSearchContent<
+  TData = Awaited<ReturnType<typeof searchContent>>,
+  TError = ErrorType<unknown>,
+>(
+  params: SearchContentParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchContent>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchContentQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get processing queue status overview
+ */
+export const getGetProcessingStatusUrl = () => {
+  return `/api/processing/status`;
+};
+
+export const getProcessingStatus = async (
+  options?: RequestInit,
+): Promise<ProcessingStatus> => {
+  return customFetch<ProcessingStatus>(getGetProcessingStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetProcessingStatusQueryKey = () => {
+  return [`/api/processing/status`] as const;
+};
+
+export const getGetProcessingStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProcessingStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getProcessingStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetProcessingStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProcessingStatus>>
+  > = ({ signal }) => getProcessingStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProcessingStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProcessingStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProcessingStatus>>
+>;
+export type GetProcessingStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get processing queue status overview
+ */
+
+export function useGetProcessingStatus<
+  TData = Awaited<ReturnType<typeof getProcessingStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getProcessingStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProcessingStatusQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

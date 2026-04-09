@@ -1,8 +1,8 @@
-# Workspace
+# B-Roll Search App
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+A semantic video search application that connects to Google Drive, processes videos (frame extraction, visual description, audio transcription), and enables natural-language search across video content. Built as a pnpm workspace monorepo using TypeScript.
 
 ## Stack
 
@@ -11,10 +11,42 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
+- **Database**: PostgreSQL + Drizzle ORM + Full-text search (tsvector)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **AI**: OpenAI (via Replit AI Integrations) — GPT-4o Vision for frame descriptions, gpt-4o-mini-transcribe for audio transcription
+- **Google Drive**: Replit Connectors SDK (`@replit/connectors-sdk`)
+- **Video processing**: FFmpeg (frame extraction, audio extraction)
+
+## Architecture
+
+### Database Tables
+- **videos** — Video metadata, Drive file ID, sync/processing status, duration
+- **frames** — Extracted frames with timestamps, image paths, GPT-generated descriptions. GIN index on description tsvector for full-text search.
+- **transcriptions** — Audio transcription segments with start/end timestamps. GIN index on content tsvector for full-text search.
+
+### API Endpoints
+- `GET /api/videos` — List all synced videos (optional status filter)
+- `GET /api/videos/:id` — Video detail with frames and transcriptions
+- `POST /api/videos/:id/process` — Trigger video processing pipeline
+- `POST /api/videos/sync` — Sync videos from a Google Drive folder
+- `GET /api/drive/folders` — List Google Drive folders
+- `GET /api/drive/files?folderId=X` — List video files in a Drive folder
+- `GET /api/search?q=X&type=all|visual|audio` — Full-text search across frames and transcriptions
+- `GET /api/processing/status` — Processing queue overview
+- `GET /api/frames/*` — Static file serving for extracted frame images
+
+### Processing Pipeline
+1. Download video from Google Drive
+2. Extract key frames with FFmpeg (1 frame per 5 seconds)
+3. Send each frame to GPT-4o Vision for text description (batch processed, rate-limited)
+4. Extract audio and transcribe with OpenAI Whisper
+5. Store all results in PostgreSQL with full-text search indexes
+
+### Key Directories
+- `data/videos/` — Downloaded video files
+- `data/frames/{videoId}/` — Extracted frame images per video
 
 ## Key Commands
 
