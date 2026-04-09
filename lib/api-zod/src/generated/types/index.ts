@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./addFrameBody";
+export * from "./addTranscriptionBody";
 export * from "./driveFile";
 export * from "./driveFolder";
 export * from "./folderDeleteResult";
@@ -27,6 +29,8 @@ export * from "./syncedFolder";
 export * from "./syncRequest";
 export * from "./syncResponse";
 export * from "./transcriptionItem";
+export * from "./updateFrameBody";
+export * from "./updateTranscriptionBody";
 export * from "./video";
 export * from "./videoDetail";
 export * from "./videoStatus";

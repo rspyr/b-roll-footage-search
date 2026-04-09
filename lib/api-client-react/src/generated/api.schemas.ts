@@ -167,6 +167,25 @@ export interface FolderResyncResult {
   videos: Video[];
 }
 
+export interface UpdateFrameBody {
+  description: string;
+}
+
+export interface AddFrameBody {
+  timestampSec: number;
+  description: string;
+}
+
+export interface UpdateTranscriptionBody {
+  content: string;
+}
+
+export interface AddTranscriptionBody {
+  startSec: number;
+  endSec: number;
+  content: string;
+}
+
 export type ListVideosParams = {
   status?: ListVideosStatus;
 };

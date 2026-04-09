@@ -238,7 +238,7 @@ export default function Library() {
         </div>
 
         {status && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
               <span className="text-sm font-medium text-muted-foreground">
                 Total
@@ -262,6 +262,12 @@ export default function Library() {
                 Pending
               </span>
               <span className="text-2xl font-bold">{status.pending}</span>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
+              <span className="text-sm font-medium text-red-500">
+                Failed
+              </span>
+              <span className="text-2xl font-bold">{status.failed}</span>
             </div>
           </div>
         )}

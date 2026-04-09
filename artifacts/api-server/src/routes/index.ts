@@ -5,6 +5,8 @@ import driveRouter from "./drive";
 import searchRouter from "./search";
 import processingRouter from "./processing";
 import foldersRouter from "./folders";
+import framesRouter from "./frames";
+import transcriptionsRouter from "./transcriptions";
 
 const router: IRouter = Router();
 
@@ -14,5 +16,7 @@ router.use(driveRouter);
 router.use(searchRouter);
 router.use(processingRouter);
 router.use(foldersRouter);
+router.use(framesRouter);
+router.use(transcriptionsRouter);
 
 export default router;

@@ -39,6 +39,10 @@ A semantic video search application that connects to Google Drive, processes vid
 - `GET /api/folders` — List synced folders with video counts and status breakdown
 - `DELETE /api/folders/:folderId` — Remove a folder and all its videos, frames, transcriptions, and local files
 - `POST /api/folders/:folderId/sync` — Re-sync a folder to find new videos from Google Drive
+- `PATCH /api/frames/:id` — Update a frame's description
+- `POST /api/videos/:id/frames` — Add a manual frame description to a video
+- `PATCH /api/transcriptions/:id` — Update a transcription segment's content
+- `POST /api/videos/:id/transcriptions` — Add a manual transcription segment to a video
 
 ### Processing Pipeline
 1. Download video from Google Drive

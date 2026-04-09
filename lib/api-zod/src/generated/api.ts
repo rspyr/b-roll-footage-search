@@ -210,6 +210,71 @@ export const GetProcessingStatusResponse = zod.object({
 });
 
 /**
+ * @summary Update a frame's description
+ */
+export const UpdateFrameDescriptionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateFrameDescriptionBody = zod.object({
+  description: zod.string(),
+});
+
+export const UpdateFrameDescriptionResponse = zod.object({
+  id: zod.number(),
+  videoId: zod.number(),
+  timestampSec: zod.number(),
+  imagePath: zod.string(),
+  description: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Add a manual frame description to a video
+ */
+export const AddManualFrameParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddManualFrameBody = zod.object({
+  timestampSec: zod.number(),
+  description: zod.string(),
+});
+
+/**
+ * @summary Update a transcription segment's content
+ */
+export const UpdateTranscriptionContentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateTranscriptionContentBody = zod.object({
+  content: zod.string(),
+});
+
+export const UpdateTranscriptionContentResponse = zod.object({
+  id: zod.number(),
+  videoId: zod.number(),
+  startSec: zod.number(),
+  endSec: zod.number(),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Add a manual transcription segment to a video
+ */
+export const AddManualTranscriptionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddManualTranscriptionBody = zod.object({
+  startSec: zod.number(),
+  endSec: zod.number(),
+  content: zod.string(),
+});
+
+/**
  * @summary List synced folders with video counts and status breakdown
  */
 export const ListFoldersResponseItem = zod.object({

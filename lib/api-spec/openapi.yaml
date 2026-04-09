@@ -227,6 +227,114 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProcessingStatus"
 
+  /frames/{id}:
+    patch:
+      operationId: updateFrameDescription
+      tags: [videos]
+      summary: Update a frame's description
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFrameBody"
+      responses:
+        "200":
+          description: Updated frame
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrameItem"
+        "404":
+          description: Frame not found
+
+  /videos/{id}/frames:
+    post:
+      operationId: addManualFrame
+      tags: [videos]
+      summary: Add a manual frame description to a video
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddFrameBody"
+      responses:
+        "201":
+          description: Created frame
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrameItem"
+        "404":
+          description: Video not found
+
+  /transcriptions/{id}:
+    patch:
+      operationId: updateTranscriptionContent
+      tags: [videos]
+      summary: Update a transcription segment's content
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTranscriptionBody"
+      responses:
+        "200":
+          description: Updated transcription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptionItem"
+        "404":
+          description: Transcription not found
+
+  /videos/{id}/transcriptions:
+    post:
+      operationId: addManualTranscription
+      tags: [videos]
+      summary: Add a manual transcription segment to a video
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTranscriptionBody"
+      responses:
+        "201":
+          description: Created transcription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptionItem"
+        "404":
+          description: Video not found
+
   /folders:
     get:
       operationId: listFolders
@@ -608,3 +716,44 @@ components:
         - newVideoCount
         - totalInDrive
         - videos
+
+    UpdateFrameBody:
+      type: object
+      properties:
+        description:
+          type: string
+      required:
+        - description
+
+    AddFrameBody:
+      type: object
+      properties:
+        timestampSec:
+          type: number
+        description:
+          type: string
+      required:
+        - timestampSec
+        - description
+
+    UpdateTranscriptionBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    AddTranscriptionBody:
+      type: object
+      properties:
+        startSec:
+          type: number
+        endSec:
+          type: number
+        content:
+          type: string
+      required:
+        - startSec
+        - endSec
+        - content

@@ -17,10 +17,13 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AddFrameBody,
+  AddTranscriptionBody,
   DriveFile,
   DriveFolder,
   FolderDeleteResult,
   FolderResyncResult,
+  FrameItem,
   HealthStatus,
   ListDriveFilesParams,
   ListDriveFoldersParams,
@@ -32,6 +35,9 @@ import type {
   SyncRequest,
   SyncResponse,
   SyncedFolder,
+  TranscriptionItem,
+  UpdateFrameBody,
+  UpdateTranscriptionBody,
   Video,
   VideoDetail,
 } from "./api.schemas";
@@ -918,6 +924,355 @@ export function useGetProcessingStatus<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Update a frame's description
+ */
+export const getUpdateFrameDescriptionUrl = (id: number) => {
+  return `/api/frames/${id}`;
+};
+
+export const updateFrameDescription = async (
+  id: number,
+  updateFrameBody: UpdateFrameBody,
+  options?: RequestInit,
+): Promise<FrameItem> => {
+  return customFetch<FrameItem>(getUpdateFrameDescriptionUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateFrameBody),
+  });
+};
+
+export const getUpdateFrameDescriptionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateFrameDescription>>,
+    TError,
+    { id: number; data: BodyType<UpdateFrameBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateFrameDescription>>,
+  TError,
+  { id: number; data: BodyType<UpdateFrameBody> },
+  TContext
+> => {
+  const mutationKey = ["updateFrameDescription"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateFrameDescription>>,
+    { id: number; data: BodyType<UpdateFrameBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateFrameDescription(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateFrameDescriptionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateFrameDescription>>
+>;
+export type UpdateFrameDescriptionMutationBody = BodyType<UpdateFrameBody>;
+export type UpdateFrameDescriptionMutationError = ErrorType<void>;
+
+/**
+ * @summary Update a frame's description
+ */
+export const useUpdateFrameDescription = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateFrameDescription>>,
+    TError,
+    { id: number; data: BodyType<UpdateFrameBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateFrameDescription>>,
+  TError,
+  { id: number; data: BodyType<UpdateFrameBody> },
+  TContext
+> => {
+  return useMutation(getUpdateFrameDescriptionMutationOptions(options));
+};
+
+/**
+ * @summary Add a manual frame description to a video
+ */
+export const getAddManualFrameUrl = (id: number) => {
+  return `/api/videos/${id}/frames`;
+};
+
+export const addManualFrame = async (
+  id: number,
+  addFrameBody: AddFrameBody,
+  options?: RequestInit,
+): Promise<FrameItem> => {
+  return customFetch<FrameItem>(getAddManualFrameUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addFrameBody),
+  });
+};
+
+export const getAddManualFrameMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addManualFrame>>,
+    TError,
+    { id: number; data: BodyType<AddFrameBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addManualFrame>>,
+  TError,
+  { id: number; data: BodyType<AddFrameBody> },
+  TContext
+> => {
+  const mutationKey = ["addManualFrame"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addManualFrame>>,
+    { id: number; data: BodyType<AddFrameBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addManualFrame(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddManualFrameMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addManualFrame>>
+>;
+export type AddManualFrameMutationBody = BodyType<AddFrameBody>;
+export type AddManualFrameMutationError = ErrorType<void>;
+
+/**
+ * @summary Add a manual frame description to a video
+ */
+export const useAddManualFrame = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addManualFrame>>,
+    TError,
+    { id: number; data: BodyType<AddFrameBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addManualFrame>>,
+  TError,
+  { id: number; data: BodyType<AddFrameBody> },
+  TContext
+> => {
+  return useMutation(getAddManualFrameMutationOptions(options));
+};
+
+/**
+ * @summary Update a transcription segment's content
+ */
+export const getUpdateTranscriptionContentUrl = (id: number) => {
+  return `/api/transcriptions/${id}`;
+};
+
+export const updateTranscriptionContent = async (
+  id: number,
+  updateTranscriptionBody: UpdateTranscriptionBody,
+  options?: RequestInit,
+): Promise<TranscriptionItem> => {
+  return customFetch<TranscriptionItem>(getUpdateTranscriptionContentUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateTranscriptionBody),
+  });
+};
+
+export const getUpdateTranscriptionContentMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTranscriptionContent>>,
+    TError,
+    { id: number; data: BodyType<UpdateTranscriptionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateTranscriptionContent>>,
+  TError,
+  { id: number; data: BodyType<UpdateTranscriptionBody> },
+  TContext
+> => {
+  const mutationKey = ["updateTranscriptionContent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateTranscriptionContent>>,
+    { id: number; data: BodyType<UpdateTranscriptionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateTranscriptionContent(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateTranscriptionContentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateTranscriptionContent>>
+>;
+export type UpdateTranscriptionContentMutationBody =
+  BodyType<UpdateTranscriptionBody>;
+export type UpdateTranscriptionContentMutationError = ErrorType<void>;
+
+/**
+ * @summary Update a transcription segment's content
+ */
+export const useUpdateTranscriptionContent = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTranscriptionContent>>,
+    TError,
+    { id: number; data: BodyType<UpdateTranscriptionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateTranscriptionContent>>,
+  TError,
+  { id: number; data: BodyType<UpdateTranscriptionBody> },
+  TContext
+> => {
+  return useMutation(getUpdateTranscriptionContentMutationOptions(options));
+};
+
+/**
+ * @summary Add a manual transcription segment to a video
+ */
+export const getAddManualTranscriptionUrl = (id: number) => {
+  return `/api/videos/${id}/transcriptions`;
+};
+
+export const addManualTranscription = async (
+  id: number,
+  addTranscriptionBody: AddTranscriptionBody,
+  options?: RequestInit,
+): Promise<TranscriptionItem> => {
+  return customFetch<TranscriptionItem>(getAddManualTranscriptionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addTranscriptionBody),
+  });
+};
+
+export const getAddManualTranscriptionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addManualTranscription>>,
+    TError,
+    { id: number; data: BodyType<AddTranscriptionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addManualTranscription>>,
+  TError,
+  { id: number; data: BodyType<AddTranscriptionBody> },
+  TContext
+> => {
+  const mutationKey = ["addManualTranscription"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addManualTranscription>>,
+    { id: number; data: BodyType<AddTranscriptionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addManualTranscription(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddManualTranscriptionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addManualTranscription>>
+>;
+export type AddManualTranscriptionMutationBody = BodyType<AddTranscriptionBody>;
+export type AddManualTranscriptionMutationError = ErrorType<void>;
+
+/**
+ * @summary Add a manual transcription segment to a video
+ */
+export const useAddManualTranscription = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addManualTranscription>>,
+    TError,
+    { id: number; data: BodyType<AddTranscriptionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addManualTranscription>>,
+  TError,
+  { id: number; data: BodyType<AddTranscriptionBody> },
+  TContext
+> => {
+  return useMutation(getAddManualTranscriptionMutationOptions(options));
+};
 
 /**
  * @summary List synced folders with video counts and status breakdown
