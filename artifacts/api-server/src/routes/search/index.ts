@@ -2,8 +2,27 @@ import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import { SearchContentQueryParams } from "@workspace/api-zod";
 import { searchRateLimit } from "../../lib/rate-limit";
+import { gemini } from "../../lib/gemini";
+import { logger } from "../../lib/logger";
 
 const router: IRouter = Router();
+
+async function embedQuery(query: string): Promise<number[] | null> {
+  try {
+    const result = await gemini.models.embedContent({
+      model: "gemini-embedding-2-preview",
+      contents: query,
+      config: {
+        outputDimensionality: 768,
+      },
+    });
+
+    return result.embeddings?.[0]?.values ?? null;
+  } catch (err) {
+    logger.error({ err, query }, "Failed to embed search query");
+    return null;
+  }
+}
 
 router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
   const params = SearchContentQueryParams.safeParse(req.query);
@@ -14,10 +33,14 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
 
   const { q, type = "all", limit = 20, offset = 0 } = params.data;
 
-  const unionParts: string[] = [];
+  const fetchLimit = limit + offset + 20;
+
+  const queryEmbedding = await embedQuery(q);
+
+  const ftsUnionParts: string[] = [];
 
   if (type === "all" || type === "visual") {
-    unionParts.push(`
+    ftsUnionParts.push(`
       SELECT
         'frame' as type,
         f.video_id as "videoId",
@@ -35,7 +58,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
   }
 
   if (type === "all" || type === "audio") {
-    unionParts.push(`
+    ftsUnionParts.push(`
       SELECT
         'transcription' as type,
         t.video_id as "videoId",
@@ -51,39 +74,118 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
     `);
   }
 
-  if (unionParts.length === 0) {
-    res.json({ results: [], total: 0, query: q });
-    return;
-  }
-
-  const unionQuery = unionParts.join(" UNION ALL ");
-  const fullQuery = `
-    SELECT * FROM (${unionQuery}) combined
-    ORDER BY rank DESC
-    LIMIT $2
-    OFFSET $3
-  `;
-  const countQuery = `SELECT COUNT(*) as total FROM (${unionQuery}) combined`;
-
   const client = await pool.connect();
   try {
-    const [dataResult, countResult] = await Promise.all([
-      client.query(fullQuery, [q, limit, offset]),
-      client.query(countQuery, [q]),
-    ]);
+    const allResults: Array<{
+      type: string;
+      videoId: number;
+      videoTitle: string;
+      timestampSec: number;
+      endSec: number | null;
+      content: string;
+      imagePath: string | null;
+      rank: number;
+      source: string;
+    }> = [];
+
+    if (queryEmbedding && (type === "all" || type === "visual")) {
+      const vectorQuery = `
+        SELECT
+          'segment' as type,
+          vs.video_id as "videoId",
+          v.title as "videoTitle",
+          vs.start_sec as "timestampSec",
+          vs.end_sec as "endSec",
+          '' as content,
+          (SELECT f.image_path FROM frames f WHERE f.video_id = vs.video_id ORDER BY ABS(f.timestamp_sec - vs.start_sec) LIMIT 1) as "imagePath",
+          1 - (vs.embedding <=> $1::vector) as similarity
+        FROM video_segments vs
+        JOIN videos v ON v.id = vs.video_id
+        WHERE vs.embedding IS NOT NULL
+        ORDER BY vs.embedding <=> $1::vector
+        LIMIT $2
+      `;
+
+      const embeddingStr = `[${queryEmbedding.join(",")}]`;
+      const vectorResult = await client.query(vectorQuery, [embeddingStr, fetchLimit]);
+
+      for (let i = 0; i < vectorResult.rows.length; i++) {
+        const row = vectorResult.rows[i];
+        const rrfScore = 1 / (60 + i + 1);
+        allResults.push({
+          type: String(row.type),
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          timestampSec: Number(row.timestampSec),
+          endSec: row.endSec != null ? Number(row.endSec) : null,
+          content: row.content ? String(row.content) : `Semantic match (similarity: ${Number(row.similarity).toFixed(3)})`,
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "vector",
+        });
+      }
+    }
+
+    if (ftsUnionParts.length > 0) {
+      const ftsUnion = ftsUnionParts.join(" UNION ALL ");
+      const ftsQuery = `
+        SELECT * FROM (${ftsUnion}) combined
+        ORDER BY rank DESC
+        LIMIT $2
+      `;
+
+      const ftsResult = await client.query(ftsQuery, [q, fetchLimit]);
+
+      for (let i = 0; i < ftsResult.rows.length; i++) {
+        const row = ftsResult.rows[i];
+        const rrfScore = 1 / (60 + i + 1);
+        allResults.push({
+          type: String(row.type),
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          timestampSec: Number(row.timestampSec),
+          endSec: row.endSec != null ? Number(row.endSec) : null,
+          content: String(row.content),
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "fts",
+        });
+      }
+    }
+
+    const mergedMap = new Map<string, typeof allResults[0]>();
+    for (const result of allResults) {
+      const key = `${result.videoId}-${result.timestampSec}`;
+      const existing = mergedMap.get(key);
+      if (existing) {
+        existing.rank += result.rank;
+        if (result.source === "fts" && result.content) {
+          existing.content = result.content;
+          existing.type = result.type;
+        }
+      } else {
+        mergedMap.set(key, { ...result });
+      }
+    }
+
+    const allMerged = Array.from(mergedMap.values())
+      .sort((a, b) => b.rank - a.rank);
+
+    const total = allMerged.length;
+    const paged = allMerged.slice(offset, offset + limit);
 
     res.json({
-      results: dataResult.rows.map((row: Record<string, unknown>) => ({
-        type: String(row.type),
-        videoId: Number(row.videoId),
-        videoTitle: String(row.videoTitle),
-        timestampSec: Number(row.timestampSec),
-        endSec: row.endSec != null ? Number(row.endSec) : null,
-        content: String(row.content),
-        imagePath: row.imagePath ? String(row.imagePath) : null,
-        rank: Number(row.rank),
+      results: paged.map(r => ({
+        type: r.type,
+        videoId: r.videoId,
+        videoTitle: r.videoTitle,
+        timestampSec: r.timestampSec,
+        endSec: r.endSec,
+        content: r.content,
+        imagePath: r.imagePath,
+        rank: r.rank,
       })),
-      total: Number(countResult.rows[0].total),
+      total,
       query: q,
     });
   } finally {

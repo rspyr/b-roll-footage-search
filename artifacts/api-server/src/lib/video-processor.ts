@@ -3,20 +3,25 @@ import { promisify } from "util";
 import path from "path";
 import fs from "fs";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
-import { db, videosTable, framesTable, transcriptionsTable } from "@workspace/db";
+import { db, videosTable, framesTable, transcriptionsTable, videoSegmentsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { downloadFile } from "./google-drive";
 import { logger } from "./logger";
+import { gemini } from "./gemini";
 
 const execFileAsync = promisify(execFile);
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const VIDEOS_DIR = path.join(DATA_DIR, "videos");
 const FRAMES_DIR = path.join(DATA_DIR, "frames");
+const SEGMENTS_DIR = path.join(DATA_DIR, "segments");
+
+const MAX_SEGMENT_DURATION = 90;
+const SEGMENT_OVERLAP = 10;
+const MAX_EMBED_DURATION = 120;
 
 function ensureDirs() {
-  for (const dir of [DATA_DIR, VIDEOS_DIR, FRAMES_DIR]) {
+  for (const dir of [DATA_DIR, VIDEOS_DIR, FRAMES_DIR, SEGMENTS_DIR]) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -71,35 +76,96 @@ export async function extractAudio(videoPath: string, videoId: number): Promise<
   return audioPath;
 }
 
+const FRAME_DESCRIPTION_PROMPT = `Analyze this video frame in thorough detail for a B-roll search index. You MUST cover ALL of the following categories:
+
+**Physical States & Body Language:**
+- Breathing patterns (panting, heavy breathing, labored breathing, gasping)
+- Signs of temperature (sweating, perspiring, flushed, overheated, shivering, cold)
+- Physical exertion indicators (exhaustion, fatigue, strain, effort)
+- Posture and body position (slouching, leaning, crouching, standing)
+
+**Animal Behavior (if animals present):**
+- Panting (tongue out, rapid breathing, drooling, salivating)
+- Emotional state (anxious, stressed, relaxed, excited, fearful, aggressive, playful)
+- Breed identification if possible
+- Tail position, ear position, eye state (half-closed, alert, droopy)
+
+**Human Behavior & Emotions (if people present):**
+- Facial expressions and emotional state (happy, frustrated, tired, focused, distressed)
+- Activities and actions in detail
+- Physical condition (sweaty, dry, clean, dirty, wet)
+
+**Environment & Context:**
+- Temperature cues (hot environment, cold environment, steam, ice, condensation)
+- Indoor/outdoor, lighting conditions
+- Weather indicators
+- Objects, furniture, equipment present
+
+**Actions & Movement:**
+- What is happening in the scene
+- Speed and intensity of movement
+- Interactions between subjects
+
+Be specific and accurate. Do NOT downplay or soften what you see. If a dog is panting with its tongue out, say "panting heavily with tongue extended" — do NOT say "relaxed and comfortable." If someone is sweating, say "visibly sweating/perspiring." Output only the description, no preamble.`;
+
 async function describeFrame(imagePath: string): Promise<string> {
   const imageBuffer = fs.readFileSync(imagePath);
   const base64Image = imageBuffer.toString("base64");
-  const mimeType = "image/jpeg";
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    max_completion_tokens: 300,
-    messages: [
+  const response = await gemini.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [
       {
         role: "user",
-        content: [
+        parts: [
+          { text: FRAME_DESCRIPTION_PROMPT },
           {
-            type: "text",
-            text: "Describe this video frame in detail for search purposes. Include: visual elements, actions, objects, people, scenery, colors, mood, lighting, and any text visible. Be specific and descriptive. Output only the description, no preamble.",
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:${mimeType};base64,${base64Image}`,
-              detail: "low",
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Image,
             },
           },
         ],
       },
     ],
+    config: {
+      maxOutputTokens: 1024,
+    },
   });
 
-  return response.choices[0]?.message?.content ?? "No description available";
+  return response.text ?? "No description available";
+}
+
+async function describeFrameGroup(imagePaths: string[]): Promise<string> {
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+    {
+      text: `You are analyzing ${imagePaths.length} consecutive frames from a video, taken a few seconds apart. Analyze them TOGETHER to understand the temporal context — what is happening over time, not just in a single instant.
+
+${FRAME_DESCRIPTION_PROMPT}
+
+Additionally, describe any CHANGES or PROGRESSION visible across the frames (e.g., "the dog continues panting across all frames, indicating sustained heavy breathing" or "the person's sweating increases between frames").`,
+    },
+  ];
+
+  for (const imagePath of imagePaths) {
+    const imageBuffer = fs.readFileSync(imagePath);
+    parts.push({
+      inlineData: {
+        mimeType: "image/jpeg",
+        data: imageBuffer.toString("base64"),
+      },
+    });
+  }
+
+  const response = await gemini.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [{ role: "user", parts }],
+    config: {
+      maxOutputTokens: 1500,
+    },
+  });
+
+  return response.text ?? "No description available";
 }
 
 interface WhisperSegment {
@@ -140,6 +206,119 @@ async function transcribeAudio(audioPath: string): Promise<WhisperSegment[]> {
   }
 }
 
+interface VideoSegmentInfo {
+  startSec: number;
+  endSec: number;
+  filePath: string;
+}
+
+async function segmentVideo(videoPath: string, videoId: number, duration: number): Promise<VideoSegmentInfo[]> {
+  const segDir = path.join(SEGMENTS_DIR, String(videoId));
+  if (!fs.existsSync(segDir)) {
+    fs.mkdirSync(segDir, { recursive: true });
+  }
+
+  if (duration <= MAX_EMBED_DURATION) {
+    return [{ startSec: 0, endSec: duration, filePath: videoPath }];
+  }
+
+  const segments: VideoSegmentInfo[] = [];
+  let startSec = 0;
+
+  while (startSec < duration) {
+    const endSec = Math.min(startSec + MAX_SEGMENT_DURATION, duration);
+    const segmentPath = path.join(segDir, `segment_${String(segments.length).padStart(4, "0")}.mp4`);
+
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-i", videoPath,
+      "-ss", String(startSec),
+      "-t", String(endSec - startSec),
+      "-c", "copy",
+      "-avoid_negative_ts", "make_zero",
+      segmentPath,
+    ]);
+
+    segments.push({ startSec, endSec, filePath: segmentPath });
+
+    startSec = endSec - SEGMENT_OVERLAP;
+    if (endSec >= duration) break;
+  }
+
+  return segments;
+}
+
+function detectMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case ".mov": return "video/quicktime";
+    case ".mp4": return "video/mp4";
+    case ".avi": return "video/x-msvideo";
+    case ".webm": return "video/webm";
+    default: return "video/mp4";
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function withRetry<T>(fn: () => Promise<T>, maxRetries: number = 3, label: string = "API call"): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      lastErr = err;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const is429 = errMsg.includes("429") || errMsg.includes("rate") || errMsg.includes("quota");
+      const is5xx = errMsg.includes("500") || errMsg.includes("503") || errMsg.includes("server");
+
+      if (attempt < maxRetries && (is429 || is5xx)) {
+        const backoff = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 30000);
+        logger.warn({ attempt, backoff, label, err: errMsg }, "Retrying after error");
+        await sleep(backoff);
+      } else if (attempt < maxRetries) {
+        const backoff = 1000 * (attempt + 1);
+        logger.warn({ attempt, backoff, label, err: errMsg }, "Retrying after error");
+        await sleep(backoff);
+      }
+    }
+  }
+  throw lastErr;
+}
+
+async function embedVideoSegment(segmentInfo: VideoSegmentInfo): Promise<number[]> {
+  const videoBytes = fs.readFileSync(segmentInfo.filePath);
+  const base64Video = videoBytes.toString("base64");
+  const mimeType = detectMimeType(segmentInfo.filePath);
+
+  return withRetry(async () => {
+    const result = await gemini.models.embedContent({
+      model: "gemini-embedding-2-preview",
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType,
+              data: base64Video,
+            },
+          },
+        ],
+      },
+      config: {
+        outputDimensionality: 768,
+      },
+    });
+
+    const embedding = result.embeddings?.[0]?.values;
+    if (!embedding) {
+      throw new Error("No embedding returned from Gemini");
+    }
+    return embedding;
+  }, 3, `embed-segment-${segmentInfo.startSec}s`);
+}
+
 export async function processVideo(videoId: number): Promise<void> {
   ensureDirs();
 
@@ -152,6 +331,7 @@ export async function processVideo(videoId: number): Promise<void> {
 
   await db.delete(framesTable).where(eq(framesTable.videoId, videoId));
   await db.delete(transcriptionsTable).where(eq(transcriptionsTable.videoId, videoId));
+  await db.delete(videoSegmentsTable).where(eq(videoSegmentsTable.videoId, videoId));
 
   try {
     let videoPath = video.localPath;
@@ -167,26 +347,55 @@ export async function processVideo(videoId: number): Promise<void> {
     await db.update(videosTable).set({ duration }).where(eq(videosTable.id, videoId));
     logger.info({ videoId, duration }, "Got video duration");
 
-    logger.info({ videoId }, "Extracting frames");
-    const framePaths = await extractFrames(videoPath, videoId);
+    const frameInterval = duration <= 30 ? 2 : 5;
+    logger.info({ videoId, frameInterval }, "Extracting frames");
+    const framePaths = await extractFrames(videoPath, videoId, frameInterval);
     logger.info({ videoId, frameCount: framePaths.length }, "Frames extracted");
 
-    logger.info({ videoId }, "Describing frames with GPT Vision");
-    const frameDescriptions = await batchProcess(
-      framePaths,
-      async (framePath) => {
-        const description = await describeFrame(framePath);
-        return { framePath, description };
-      },
-      { concurrency: 2, retries: 3 },
-    );
+    logger.info({ videoId }, "Describing frames with Gemini Vision");
+    const frameDescriptions: Array<{ framePath: string; description: string; originalIndex: number }> = [];
 
-    for (let i = 0; i < frameDescriptions.length; i++) {
-      const { framePath, description } = frameDescriptions[i];
+    let i = 0;
+    while (i < framePaths.length) {
+      const groupSize = Math.min(3, framePaths.length - i);
+      const groupPaths = framePaths.slice(i, i + groupSize);
+
+      let description: string;
+      try {
+        if (groupSize >= 2) {
+          description = await withRetry(
+            () => describeFrameGroup(groupPaths),
+            2,
+            `describe-frame-group-${i}`
+          );
+        } else {
+          description = await withRetry(
+            () => describeFrame(groupPaths[0]),
+            2,
+            `describe-frame-${i}`
+          );
+        }
+      } catch (err) {
+        logger.warn({ videoId, frameIndex: i, err }, "Frame description failed, retrying single frame");
+        try {
+          description = await describeFrame(framePaths[i]);
+        } catch (retryErr) {
+          logger.error({ videoId, frameIndex: i, err: retryErr }, "Frame description retry failed");
+          description = "Description unavailable";
+        }
+      }
+
+      frameDescriptions.push({ framePath: framePaths[i], description, originalIndex: i });
+      i += groupSize;
+
+      await sleep(500);
+    }
+
+    for (const { framePath, description, originalIndex } of frameDescriptions) {
       const relativePath = path.relative(FRAMES_DIR, framePath);
       await db.insert(framesTable).values({
         videoId,
-        timestampSec: i * 5,
+        timestampSec: originalIndex * frameInterval,
         imagePath: relativePath,
         description,
       });
@@ -213,6 +422,42 @@ export async function processVideo(videoId: number): Promise<void> {
       }
     } catch (err) {
       logger.warn({ videoId, err }, "Audio extraction/transcription failed, continuing without transcription");
+    }
+
+    logger.info({ videoId }, "Segmenting video and generating embeddings");
+    try {
+      const videoSegments = await segmentVideo(videoPath, videoId, duration);
+      logger.info({ videoId, segmentCount: videoSegments.length }, "Video segmented");
+
+      for (const seg of videoSegments) {
+        try {
+          const embedding = await embedVideoSegment(seg);
+
+          await db.insert(videoSegmentsTable).values({
+            videoId,
+            startSec: seg.startSec,
+            endSec: seg.endSec,
+            embedding,
+          });
+
+          logger.info({ videoId, startSec: seg.startSec, endSec: seg.endSec }, "Segment embedded and saved");
+        } catch (err) {
+          logger.error({ videoId, startSec: seg.startSec, err }, "Failed to embed video segment, skipping");
+        }
+
+        await sleep(1000);
+      }
+
+      const segDir = path.join(SEGMENTS_DIR, String(videoId));
+      if (fs.existsSync(segDir)) {
+        const segFiles = fs.readdirSync(segDir);
+        for (const f of segFiles) {
+          fs.unlinkSync(path.join(segDir, f));
+        }
+        fs.rmdirSync(segDir);
+      }
+    } catch (err) {
+      logger.error({ videoId, err }, "Video segmentation/embedding failed, continuing without embeddings");
     }
 
     const thumbnailPath = framePaths[0] ? path.relative(FRAMES_DIR, framePaths[0]) : null;
