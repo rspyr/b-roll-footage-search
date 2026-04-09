@@ -38,8 +38,7 @@ export default function Library() {
     }
   });
 
-  const handleProcess = (id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleProcess = (id: number) => {
     processMutation.mutate({ id });
   };
 
@@ -166,7 +165,7 @@ export default function Library() {
                           <DropdownMenuItem onClick={() => setLocation(`/videos/${video.id}`)}>
                             <Play size={14} className="mr-2" /> View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => handleProcess(video.id, e as any)}>
+                          <DropdownMenuItem onClick={() => handleProcess(video.id)}>
                             <RefreshCw size={14} className="mr-2" /> 
                             {video.status === 'completed' ? 'Reprocess' : 'Process Now'}
                           </DropdownMenuItem>

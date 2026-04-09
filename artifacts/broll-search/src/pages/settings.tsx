@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListDriveFolders, useListDriveFiles, useSyncVideos, getListVideosQueryKey, getGetProcessingStatusQueryKey } from "@workspace/api-client-react";
+import { useListDriveFolders, useListDriveFiles, useSyncVideos, getListVideosQueryKey, getGetProcessingStatusQueryKey, getListDriveFilesQueryKey } from "@workspace/api-client-react";
 import { Folder, HardDrive, ChevronRight, CheckCircle, Loader2, PlayCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +15,10 @@ export default function Settings() {
   const currentFolderId = folderHistory[folderHistory.length - 1].id;
 
   const { data: folders, isLoading: isLoadingFolders } = useListDriveFolders({ parentId: currentFolderId });
+  const driveFilesParams = { folderId: currentFolderId as string };
   const { data: files, isLoading: isLoadingFiles } = useListDriveFiles(
-    { folderId: currentFolderId as string }, 
-    { query: { enabled: !!currentFolderId } }
+    driveFilesParams, 
+    { query: { enabled: !!currentFolderId, queryKey: getListDriveFilesQueryKey(driveFilesParams) } }
   );
 
   const syncMutation = useSyncVideos({

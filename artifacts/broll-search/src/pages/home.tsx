@@ -14,8 +14,8 @@ export default function Home() {
   const { data: status } = useGetProcessingStatus();
   const { data: videos, isLoading } = useListVideos({ status: "completed" });
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.submit();
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (searchQuery.trim()) {
       setLocation(`/search?q=${encodeURIComponent(searchQuery)}`);
     }
@@ -30,7 +30,7 @@ export default function Home() {
             Search through your video library's visual frames and spoken content using natural language.
           </p>
           
-          <form onSubmit={(e) => { e.preventDefault(); handleSearch(e as any); }} className="w-full max-w-2xl relative flex items-center">
+          <form onSubmit={handleSearch} className="w-full max-w-2xl relative flex items-center">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
             <Input 
               value={searchQuery}

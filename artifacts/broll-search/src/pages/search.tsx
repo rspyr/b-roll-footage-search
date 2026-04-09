@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { useSearchContent } from "@workspace/api-client-react";
+import { useSearchContent, getSearchContentQueryKey } from "@workspace/api-client-react";
 import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,10 @@ export default function SearchPage() {
     setType(typeParam);
   }, [q, typeParam]);
 
+  const searchParams2 = { q, type: type === "all" ? undefined : type, limit: 50 };
   const { data: searchData, isLoading } = useSearchContent(
-    { q, type: type === "all" ? undefined : type, limit: 50 },
-    { query: { enabled: !!q } }
+    searchParams2,
+    { query: { enabled: !!q, queryKey: getSearchContentQueryKey(searchParams2) } }
   );
 
   const handleSearch = (e: React.FormEvent) => {
