@@ -2,6 +2,7 @@ import { logger } from "./lib/logger";
 
 const requiredEnvVars = [
   { name: "DATABASE_URL", description: "PostgreSQL connection string" },
+  { name: "SESSION_SECRET", description: "Secret for signing session cookies" },
   { name: "AI_INTEGRATIONS_OPENAI_BASE_URL", description: "OpenAI integration base URL" },
   { name: "AI_INTEGRATIONS_OPENAI_API_KEY", description: "OpenAI integration API key" },
 ];
@@ -46,7 +47,21 @@ async function resetZombieProcessingVideos() {
   }
 }
 
+async function ensureSessionTable() {
+  const { pool } = await import("@workspace/db");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS session (
+      sid VARCHAR NOT NULL COLLATE "default",
+      sess JSON NOT NULL,
+      expire TIMESTAMP(6) NOT NULL,
+      CONSTRAINT session_pkey PRIMARY KEY (sid)
+    );
+    CREATE INDEX IF NOT EXISTS IDX_session_expire ON session (expire);
+  `);
+}
+
 async function start() {
+  await ensureSessionTable();
   await resetZombieProcessingVideos();
 
   const { default: app } = await import("./app");

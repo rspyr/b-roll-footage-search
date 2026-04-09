@@ -1,9 +1,13 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import pinoHttp from "pino-http";
 import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { pool } from "@workspace/db";
+import { requireAuth } from "./middleware/requireAuth";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -41,14 +45,38 @@ app.use(
           origin: corsOrigin || false,
           credentials: true,
         }
-      : {},
+      : {
+          origin: true,
+          credentials: true,
+        },
   ),
 );
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api/frames", express.static(path.join(process.cwd(), "data", "frames")));
+const PgStore = connectPgSimple(session);
+
+app.use(
+  session({
+    store: new PgStore({
+      pool,
+      tableName: "session",
+      pruneSessionInterval: 60 * 15,
+    }),
+    secret: process.env.SESSION_SECRET!,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: isProduction,
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: isProduction ? "none" : "lax",
+    },
+  }),
+);
+
+app.use("/api/frames", requireAuth, express.static(path.join(process.cwd(), "data", "frames")));
 
 app.use("/api", router);
 

@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Film, Search, Settings, HardDrive, LayoutGrid, Loader2 } from "lucide-react";
+import { Film, Search, Settings, HardDrive, LayoutGrid, Loader2, LogOut } from "lucide-react";
 import { useHealthCheck } from "@workspace/api-client-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: health } = useHealthCheck();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -37,6 +39,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+        {user && (
+          <div className="p-4 border-t border-border">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{user.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
+              <button
+                onClick={logout}
+                className="ml-2 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+                title="Sign out"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          </div>
+        )}
         <div className="p-4 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${health ? "bg-green-500" : "bg-red-500"}`} />

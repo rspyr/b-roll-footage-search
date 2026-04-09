@@ -22,11 +22,26 @@ A semantic video search application that connects to Google Drive, processes vid
 ## Architecture
 
 ### Database Tables
+- **users** — User accounts with email (unique), name, bcrypt password hash, timestamps. Only `@hvaclaunch.ai` emails can register.
+- **session** — Server-side session storage (connect-pg-simple). Auto-created on startup.
 - **videos** — Video metadata, Drive file ID, sync/processing status, duration
 - **frames** — Extracted frames with timestamps, image paths, GPT-generated descriptions. GIN index on description tsvector for full-text search.
 - **transcriptions** — Audio transcription segments with start/end timestamps. GIN index on content tsvector for full-text search.
 
+### Authentication
+- Custom email/password auth restricted to `@hvaclaunch.ai` domain
+- Passwords hashed with bcrypt (12 rounds)
+- Sessions stored in PostgreSQL via `express-session` + `connect-pg-simple`
+- Session cookie: `connect.sid`, 7-day expiry, httpOnly
+- `requireAuth` middleware protects all API routes except `/api/healthz` and `/api/auth/*`
+- Frontend uses `AuthProvider` context with `useAuth` hook; unauthenticated users see login/register page
+- User info and sign-out button displayed in sidebar
+
 ### API Endpoints
+- `POST /api/auth/register` — Register (email, password, name); validates @hvaclaunch.ai domain
+- `POST /api/auth/login` — Login with email/password, creates session
+- `POST /api/auth/logout` — Destroy session
+- `GET /api/auth/me` — Get current authenticated user
 - `GET /api/videos` — List all synced videos (optional status filter)
 - `GET /api/videos/:id` — Video detail with frames and transcriptions
 - `POST /api/videos/:id/process` — Trigger video processing pipeline
