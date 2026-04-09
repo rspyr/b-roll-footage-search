@@ -85,7 +85,7 @@ export default function Home() {
           <Card className="bg-card">
             <CardHeader className="py-4 px-5 border-b border-border/50">
               <CardTitle className="text-sm font-medium flex items-center gap-2 text-amber-500">
-                <Loader2 size={16} className="animate-spin" /> Processing
+                <Loader2 size={16} className={hasActiveProcessing ? "animate-spin" : ""} /> Processing
               </CardTitle>
             </CardHeader>
             <CardContent className="py-4 px-5">
