@@ -48,6 +48,18 @@ A semantic video search application that connects to Google Drive, processes vid
 - `data/videos/` — Downloaded video files
 - `data/frames/{videoId}/` — Extracted frame images per video
 
+### Frontend (React + Vite)
+- **Artifact**: `artifacts/broll-search` at preview path `/`
+- **Framework**: React + Vite + Tailwind CSS + shadcn/ui
+- **Routing**: Wouter (client-side)
+- **Data fetching**: TanStack React Query + Orval-generated hooks from `@workspace/api-client-react`
+- **Pages**:
+  - `/` — Home with search bar, processing status dashboard, recently processed videos
+  - `/search?q=X` — Search results grid with type filters (All/Visual/Audio)
+  - `/videos/:id` — Video detail with frame timeline and transcription segments
+  - `/library` — Video library with status badges and reprocessing controls
+  - `/settings` — Google Drive folder browser and video sync
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

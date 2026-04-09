@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "B-Roll Search"
+version = "1.0.0"
+id = "artifacts/broll-search"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18625
+
+[services.development]
+run = "pnpm --filter @workspace/broll-search run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/broll-search", "run", "build" ]
+publicDir = "artifacts/broll-search/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18625"
+BASE_PATH = "/"
