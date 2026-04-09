@@ -101,7 +101,13 @@ async function describeFrame(imagePath: string): Promise<string> {
   return response.choices[0]?.message?.content ?? "No description available";
 }
 
-async function transcribeAudio(audioPath: string): Promise<Array<{ start: number; end: number; text: string }>> {
+interface WhisperSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+async function transcribeAudio(audioPath: string): Promise<WhisperSegment[]> {
   const audioBuffer = fs.readFileSync(audioPath);
   const audioFile = new File([audioBuffer], "audio.wav", { type: "audio/wav" });
 
@@ -117,13 +123,14 @@ async function transcribeAudio(audioPath: string): Promise<Array<{ start: number
       return [];
     }
 
+    const duration = audioBuffer.length / (16000 * 2);
+
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-    const totalDuration = audioBuffer.length / (16000 * 2);
-    const segmentDuration = totalDuration / sentences.length;
+    const segDuration = duration / Math.max(sentences.length, 1);
 
     return sentences.map((sentence, i) => ({
-      start: i * segmentDuration,
-      end: (i + 1) * segmentDuration,
+      start: Math.round(i * segDuration * 100) / 100,
+      end: Math.round((i + 1) * segDuration * 100) / 100,
       text: sentence.trim(),
     }));
   } catch (err) {
@@ -218,5 +225,42 @@ export async function processVideo(videoId: number): Promise<void> {
       processingError: err instanceof Error ? err.message : String(err),
     }).where(eq(videosTable.id, videoId));
     throw err;
+  }
+}
+
+export async function processNextPending(): Promise<void> {
+  const [nextVideo] = await db.select().from(videosTable)
+    .where(eq(videosTable.status, "pending"))
+    .orderBy(videosTable.createdAt)
+    .limit(1);
+
+  if (nextVideo) {
+    await processVideo(nextVideo.id);
+  }
+}
+
+let processingActive = false;
+
+export async function startProcessingQueue(): Promise<void> {
+  if (processingActive) return;
+  processingActive = true;
+
+  try {
+    while (true) {
+      const [nextVideo] = await db.select().from(videosTable)
+        .where(eq(videosTable.status, "pending"))
+        .orderBy(videosTable.createdAt)
+        .limit(1);
+
+      if (!nextVideo) break;
+
+      try {
+        await processVideo(nextVideo.id);
+      } catch (err) {
+        logger.error({ videoId: nextVideo.id, err }, "Failed to process video in queue, moving to next");
+      }
+    }
+  } finally {
+    processingActive = false;
   }
 }

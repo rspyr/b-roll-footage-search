@@ -2,6 +2,8 @@ import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
 import fs from "fs";
 import path from "path";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 
 const connectors = new ReplitConnectors();
 
@@ -84,8 +86,15 @@ export async function downloadFile(fileId: string, destPath: string): Promise<vo
     throw new Error(`Failed to download file ${fileId}: ${response.status} ${response.statusText}`);
   }
 
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  fs.writeFileSync(destPath, buffer);
-  logger.info({ fileId, destPath, size: buffer.length }, "Downloaded file from Google Drive");
+  const body = response.body;
+  if (!body) {
+    throw new Error(`No response body for file ${fileId}`);
+  }
+
+  const nodeStream = Readable.fromWeb(body as import("stream/web").ReadableStream);
+  const writeStream = fs.createWriteStream(destPath);
+  await pipeline(nodeStream, writeStream);
+
+  const stats = fs.statSync(destPath);
+  logger.info({ fileId, destPath, size: stats.size }, "Downloaded file from Google Drive");
 }

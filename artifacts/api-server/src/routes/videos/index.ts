@@ -8,13 +8,12 @@ import {
   SyncVideosBody,
 } from "@workspace/api-zod";
 import { listVideoFiles } from "../../lib/google-drive";
-import { processVideo } from "../../lib/video-processor";
+import { processVideo, startProcessingQueue } from "../../lib/video-processor";
 
 const router: IRouter = Router();
 
 router.get("/videos", async (req, res): Promise<void> => {
   const params = ListVideosQueryParams.safeParse(req.query);
-  let query = db.select().from(videosTable).orderBy(videosTable.createdAt);
 
   if (params.success && params.data.status) {
     const videos = await db.select().from(videosTable)
@@ -24,7 +23,7 @@ router.get("/videos", async (req, res): Promise<void> => {
     return;
   }
 
-  const videos = await query;
+  const videos = await db.select().from(videosTable).orderBy(videosTable.createdAt);
   res.json(videos);
 });
 
@@ -69,14 +68,18 @@ router.post("/videos/:id/process", async (req, res): Promise<void> => {
     return;
   }
 
-  processVideo(params.data.id).catch(err => {
-    req.log.error({ err, videoId: params.data.id }, "Background processing failed");
+  await db.update(videosTable)
+    .set({ status: "pending" })
+    .where(eq(videosTable.id, params.data.id));
+
+  startProcessingQueue().catch(err => {
+    req.log.error({ err, videoId: params.data.id }, "Background processing queue failed");
   });
 
   res.json({
-    message: "Processing started",
+    message: "Video queued for processing",
     videoId: params.data.id,
-    status: "processing",
+    status: "pending",
   });
 });
 
@@ -101,13 +104,17 @@ router.post("/videos/sync", async (req, res): Promise<void> => {
         driveFolderId: parsed.data.folderId,
         mimeType: file.mimeType,
         fileSize: file.size ? parseInt(file.size, 10) : null,
-        status: "synced",
+        status: "pending",
       }).returning();
       syncedVideos.push(inserted);
     } else {
       syncedVideos.push(existing[0]);
     }
   }
+
+  startProcessingQueue().catch(err => {
+    req.log.error({ err }, "Background processing queue failed after sync");
+  });
 
   res.json({
     syncedCount: syncedVideos.length,
