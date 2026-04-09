@@ -15,8 +15,25 @@ export default function Library() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const { data: videos, isLoading } = useListVideos();
-  const { data: status } = useGetProcessingStatus();
+  const { data: status } = useGetProcessingStatus({
+    query: {
+      queryKey: getGetProcessingStatusQueryKey(),
+      refetchInterval: (query) => {
+        const d = query.state.data;
+        if (d && ((d.pending ?? 0) > 0 || (d.processing ?? 0) > 0)) return 3000;
+        return false;
+      },
+    },
+  });
+
+  const hasActiveProcessing = (status?.pending ?? 0) > 0 || (status?.processing ?? 0) > 0;
+
+  const { data: videos, isLoading } = useListVideos(undefined, {
+    query: {
+      queryKey: getListVideosQueryKey(),
+      refetchInterval: hasActiveProcessing ? 5000 : false,
+    },
+  });
   
   const processMutation = useProcessVideo({
     mutation: {

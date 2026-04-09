@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Search, PlayCircle, HardDrive, Loader2, Video } from "lucide-react";
-import { useGetProcessingStatus, useListVideos } from "@workspace/api-client-react";
+import { useGetProcessingStatus, useListVideos, getGetProcessingStatusQueryKey, getListVideosQueryKey } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +11,25 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: status } = useGetProcessingStatus();
-  const { data: videos, isLoading } = useListVideos({ status: "completed" });
+  const { data: status } = useGetProcessingStatus({
+    query: {
+      queryKey: getGetProcessingStatusQueryKey(),
+      refetchInterval: (query) => {
+        const d = query.state.data;
+        if (d && ((d.pending ?? 0) > 0 || (d.processing ?? 0) > 0)) return 3000;
+        return false;
+      },
+    },
+  });
+
+  const hasActiveProcessing = (status?.pending ?? 0) > 0 || (status?.processing ?? 0) > 0;
+
+  const { data: videos, isLoading } = useListVideos({ status: "completed" }, {
+    query: {
+      queryKey: getListVideosQueryKey({ status: "completed" }),
+      refetchInterval: hasActiveProcessing ? 5000 : false,
+    },
+  });
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
