@@ -60,6 +60,15 @@ A semantic video search application that connects to Google Drive, processes vid
   - `/library` — Video library with status badges and reprocessing controls
   - `/settings` — Google Drive folder browser and video sync
 
+## Production Hardening
+
+- **CORS**: Restricted to `CORS_ORIGIN` env var in production (blocks all cross-origin if unset); permissive in development. `trust proxy` enabled in production for correct client IP identification.
+- **Rate Limiting**: `express-rate-limit` applied to expensive endpoints — search (30/min), sync (5/min), process (10/min)
+- **Health Check**: `/api/healthz` verifies database connectivity before reporting healthy
+- **Zombie Recovery**: Videos stuck in "processing" status are automatically reset to "pending" on server startup
+- **Startup Validation**: All required environment variables (DATABASE_URL, OpenAI config) validated at boot with clear error messages
+- **Log Level**: Configurable via `LOG_LEVEL` environment variable (already supported by pino logger)
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

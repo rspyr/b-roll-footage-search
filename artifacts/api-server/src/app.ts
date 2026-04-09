@@ -5,7 +5,13 @@ import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const app: Express = express();
+
+if (isProduction) {
+  app.set("trust proxy", 1);
+}
 
 app.use(
   pinoHttp({
@@ -26,7 +32,19 @@ app.use(
     },
   }),
 );
-app.use(cors());
+
+const corsOrigin = process.env.CORS_ORIGIN;
+app.use(
+  cors(
+    isProduction
+      ? {
+          origin: corsOrigin || false,
+          credentials: true,
+        }
+      : {},
+  ),
+);
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 

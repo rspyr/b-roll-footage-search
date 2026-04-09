@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import { SearchContentQueryParams } from "@workspace/api-zod";
+import { searchRateLimit } from "../../lib/rate-limit";
 
 const router: IRouter = Router();
 
-router.get("/search", async (req, res): Promise<void> => {
+router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
   const params = SearchContentQueryParams.safeParse(req.query);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

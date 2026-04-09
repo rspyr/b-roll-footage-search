@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { listVideoFiles } from "../../lib/google-drive";
 import { processVideo, startProcessingQueue } from "../../lib/video-processor";
+import { syncRateLimit, processRateLimit } from "../../lib/rate-limit";
 
 const router: IRouter = Router();
 
@@ -55,7 +56,7 @@ router.get("/videos/:id", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/videos/:id/process", async (req, res): Promise<void> => {
+router.post("/videos/:id/process", processRateLimit, async (req, res): Promise<void> => {
   const params = ProcessVideoParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -83,7 +84,7 @@ router.post("/videos/:id/process", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/videos/sync", async (req, res): Promise<void> => {
+router.post("/videos/sync", syncRateLimit, async (req, res): Promise<void> => {
   const parsed = SyncVideosBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
