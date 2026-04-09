@@ -37,42 +37,60 @@ export async function listFolders(parentId?: string): Promise<DriveFolder[]> {
     query += ` and '${parentId}' in parents`;
   }
 
-  const params = new URLSearchParams({
-    q: query,
-    fields: "files(id,name,mimeType)",
-    orderBy: "name",
-    pageSize: "100",
-    supportsAllDrives: "true",
-    includeItemsFromAllDrives: "true",
-  });
+  const allFolders: DriveFolder[] = [];
+  let pageToken: string | undefined;
 
-  const response = await connectors.proxy("google-drive", `/drive/v3/files?${params.toString()}`, {
-    method: "GET",
-  });
+  do {
+    const params = new URLSearchParams({
+      q: query,
+      fields: "nextPageToken,files(id,name,mimeType)",
+      orderBy: "name",
+      pageSize: "1000",
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
 
-  const data = await response.json() as { files?: DriveFolder[] };
-  return data.files || [];
+    const response = await connectors.proxy("google-drive", `/drive/v3/files?${params.toString()}`, {
+      method: "GET",
+    });
+
+    const data = await response.json() as { files?: DriveFolder[]; nextPageToken?: string };
+    allFolders.push(...(data.files || []));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return allFolders;
 }
 
 export async function listVideoFiles(folderId: string): Promise<DriveFile[]> {
   const mimeQuery = VIDEO_MIME_TYPES.map(m => `mimeType='${m}'`).join(" or ");
   const query = `(${mimeQuery}) and '${folderId}' in parents and trashed=false`;
 
-  const params = new URLSearchParams({
-    q: query,
-    fields: "files(id,name,mimeType,size)",
-    orderBy: "name",
-    pageSize: "100",
-    supportsAllDrives: "true",
-    includeItemsFromAllDrives: "true",
-  });
+  const allFiles: DriveFile[] = [];
+  let pageToken: string | undefined;
 
-  const response = await connectors.proxy("google-drive", `/drive/v3/files?${params.toString()}`, {
-    method: "GET",
-  });
+  do {
+    const params = new URLSearchParams({
+      q: query,
+      fields: "nextPageToken,files(id,name,mimeType,size)",
+      orderBy: "name",
+      pageSize: "1000",
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
 
-  const data = await response.json() as { files?: DriveFile[] };
-  return data.files || [];
+    const response = await connectors.proxy("google-drive", `/drive/v3/files?${params.toString()}`, {
+      method: "GET",
+    });
+
+    const data = await response.json() as { files?: DriveFile[]; nextPageToken?: string };
+    allFiles.push(...(data.files || []));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return allFiles;
 }
 
 export async function getFolderMetadata(folderId: string): Promise<DriveFolder> {
