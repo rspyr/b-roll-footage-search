@@ -138,6 +138,19 @@ export const ListDriveFoldersResponseItem = zod.object({
 export const ListDriveFoldersResponse = zod.array(ListDriveFoldersResponseItem);
 
 /**
+ * @summary Get metadata for a specific Google Drive folder
+ */
+export const GetDriveFolderMetadataParams = zod.object({
+  folderId: zod.coerce.string(),
+});
+
+export const GetDriveFolderMetadataResponse = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  mimeType: zod.string(),
+});
+
+/**
  * @summary List video files in a Google Drive folder
  */
 export const ListDriveFilesQueryParams = zod.object({

@@ -135,6 +135,27 @@ paths:
                 items:
                   $ref: "#/components/schemas/DriveFolder"
 
+  /drive/folders/{folderId}:
+    get:
+      operationId: getDriveFolderMetadata
+      tags: [drive]
+      summary: Get metadata for a specific Google Drive folder
+      parameters:
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Folder metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriveFolder"
+        "404":
+          description: Folder not found
+
   /drive/files:
     get:
       operationId: listDriveFiles

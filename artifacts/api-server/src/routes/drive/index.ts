@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { ListDriveFoldersQueryParams, ListDriveFilesQueryParams } from "@workspace/api-zod";
-import { listFolders, listVideoFiles } from "../../lib/google-drive";
+import { ListDriveFoldersQueryParams, ListDriveFilesQueryParams, GetDriveFolderMetadataParams } from "@workspace/api-zod";
+import { listFolders, listVideoFiles, getFolderMetadata } from "../../lib/google-drive";
 
 const router: IRouter = Router();
 
@@ -20,6 +20,21 @@ router.get("/drive/files", async (req, res): Promise<void> => {
 
   const files = await listVideoFiles(params.data.folderId);
   res.json(files);
+});
+
+router.get("/drive/folders/:folderId", async (req, res): Promise<void> => {
+  const params = GetDriveFolderMetadataParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  try {
+    const folder = await getFolderMetadata(params.data.folderId);
+    res.json(folder);
+  } catch (err) {
+    res.status(404).json({ error: "Folder not found or inaccessible" });
+  }
 });
 
 export default router;

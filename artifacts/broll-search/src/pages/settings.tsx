@@ -1,17 +1,38 @@
 import { useState } from "react";
-import { useListDriveFolders, useListDriveFiles, useSyncVideos, getListVideosQueryKey, getGetProcessingStatusQueryKey, getListDriveFilesQueryKey } from "@workspace/api-client-react";
-import { Folder, HardDrive, ChevronRight, CheckCircle, Loader2, PlayCircle, AlertCircle } from "lucide-react";
+import { useListDriveFolders, useListDriveFiles, useSyncVideos, getListVideosQueryKey, getGetProcessingStatusQueryKey, getListDriveFilesQueryKey, getDriveFolderMetadata } from "@workspace/api-client-react";
+import { Folder, HardDrive, ChevronRight, Loader2, PlayCircle, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { formatBytes } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+
+function parseFolderIdFromUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const foldersMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (foldersMatch) return foldersMatch[1];
+
+  try {
+    const url = new URL(trimmed);
+    const idParam = url.searchParams.get("id");
+    if (idParam && /^[a-zA-Z0-9_-]+$/.test(idParam)) return idParam;
+  } catch {}
+
+  if (/^[a-zA-Z0-9_-]+$/.test(trimmed)) return trimmed;
+
+  return null;
+}
 
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [folderHistory, setFolderHistory] = useState<{id: string | undefined, name: string}[]>([{id: undefined, name: "Root"}]);
+  const [folderLinkInput, setFolderLinkInput] = useState("");
+  const [isResolvingFolder, setIsResolvingFolder] = useState(false);
   const currentFolderId = folderHistory[folderHistory.length - 1].id;
 
   const { data: folders, isLoading: isLoadingFolders } = useListDriveFolders({ parentId: currentFolderId });
@@ -54,6 +75,33 @@ export default function Settings() {
     syncMutation.mutate({ data: { folderId: currentFolderId } });
   };
 
+  const handleFolderLinkSubmit = async () => {
+    const folderId = parseFolderIdFromUrl(folderLinkInput);
+    if (!folderId) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Link",
+        description: "Please paste a valid Google Drive folder URL (e.g. https://drive.google.com/drive/folders/ABC123).",
+      });
+      return;
+    }
+
+    setIsResolvingFolder(true);
+    try {
+      const folder = await getDriveFolderMetadata(folderId);
+      setFolderHistory([{ id: undefined, name: "Root" }, { id: folder.id, name: folder.name }]);
+      setFolderLinkInput("");
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Invalid Folder Link",
+        description: "Could not access the folder. Make sure the link is correct and you have permission.",
+      });
+    } finally {
+      setIsResolvingFolder(false);
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -70,8 +118,28 @@ export default function Settings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Link size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Paste a Google Drive folder link or ID..."
+                  value={folderLinkInput}
+                  onChange={(e) => setFolderLinkInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleFolderLinkSubmit(); }}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                variant="secondary"
+                onClick={handleFolderLinkSubmit}
+                disabled={!folderLinkInput.trim() || isResolvingFolder}
+              >
+                {isResolvingFolder && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Go
+              </Button>
+            </div>
             
-            {/* Breadcrumb Navigation */}
             <div className="flex items-center gap-1 p-2 bg-muted/50 rounded-md border border-border text-sm overflow-x-auto whitespace-nowrap">
               {folderHistory.map((folder, index) => (
                 <div key={index} className="flex items-center">
@@ -86,10 +154,8 @@ export default function Settings() {
               ))}
             </div>
 
-            {/* Folder Browser */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[400px]">
               
-              {/* Folders */}
               <div className="border border-border rounded-lg flex flex-col bg-card overflow-hidden">
                 <div className="p-3 border-b border-border bg-muted/30 font-medium text-sm">Folders</div>
                 <ScrollArea className="flex-1">
@@ -117,7 +183,6 @@ export default function Settings() {
                 </ScrollArea>
               </div>
 
-              {/* Files in selected folder */}
               <div className="border border-border rounded-lg flex flex-col bg-card overflow-hidden">
                 <div className="p-3 border-b border-border bg-muted/30 font-medium text-sm">
                   Video Files {files?.length ? `(${files.length})` : ''}

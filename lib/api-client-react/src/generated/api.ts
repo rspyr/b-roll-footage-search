@@ -565,6 +565,95 @@ export function useListDriveFolders<
 }
 
 /**
+ * @summary Get metadata for a specific Google Drive folder
+ */
+export const getGetDriveFolderMetadataUrl = (folderId: string) => {
+  return `/api/drive/folders/${folderId}`;
+};
+
+export const getDriveFolderMetadata = async (
+  folderId: string,
+  options?: RequestInit,
+): Promise<DriveFolder> => {
+  return customFetch<DriveFolder>(getGetDriveFolderMetadataUrl(folderId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDriveFolderMetadataQueryKey = (folderId: string) => {
+  return [`/api/drive/folders/${folderId}`] as const;
+};
+
+export const getGetDriveFolderMetadataQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDriveFolderMetadata>>,
+  TError = ErrorType<void>,
+>(
+  folderId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDriveFolderMetadata>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetDriveFolderMetadataQueryKey(folderId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDriveFolderMetadata>>
+  > = ({ signal }) =>
+    getDriveFolderMetadata(folderId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!folderId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDriveFolderMetadata>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDriveFolderMetadataQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDriveFolderMetadata>>
+>;
+export type GetDriveFolderMetadataQueryError = ErrorType<void>;
+
+/**
+ * @summary Get metadata for a specific Google Drive folder
+ */
+
+export function useGetDriveFolderMetadata<
+  TData = Awaited<ReturnType<typeof getDriveFolderMetadata>>,
+  TError = ErrorType<void>,
+>(
+  folderId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDriveFolderMetadata>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDriveFolderMetadataQueryOptions(folderId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary List video files in a Google Drive folder
  */
 export const getListDriveFilesUrl = (params: ListDriveFilesParams) => {
