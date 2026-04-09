@@ -42,6 +42,8 @@ export async function listFolders(parentId?: string): Promise<DriveFolder[]> {
     fields: "files(id,name,mimeType)",
     orderBy: "name",
     pageSize: "100",
+    supportsAllDrives: "true",
+    includeItemsFromAllDrives: "true",
   });
 
   const response = await connectors.proxy("google-drive", `/drive/v3/files?${params.toString()}`, {
@@ -61,6 +63,8 @@ export async function listVideoFiles(folderId: string): Promise<DriveFile[]> {
     fields: "files(id,name,mimeType,size)",
     orderBy: "name",
     pageSize: "100",
+    supportsAllDrives: "true",
+    includeItemsFromAllDrives: "true",
   });
 
   const response = await connectors.proxy("google-drive", `/drive/v3/files?${params.toString()}`, {
@@ -74,6 +78,7 @@ export async function listVideoFiles(folderId: string): Promise<DriveFile[]> {
 export async function getFolderMetadata(folderId: string): Promise<DriveFolder> {
   const params = new URLSearchParams({
     fields: "id,name,mimeType",
+    supportsAllDrives: "true",
   });
 
   const response = await connectors.proxy("google-drive", `/drive/v3/files/${folderId}?${params.toString()}`, {
@@ -81,6 +86,8 @@ export async function getFolderMetadata(folderId: string): Promise<DriveFolder> 
   });
 
   if (!response.ok) {
+    const errorBody = await response.text();
+    logger.error({ folderId, status: response.status, errorBody }, "Failed to get folder metadata from Google Drive");
     throw new Error(`Failed to get folder metadata: ${response.status} ${response.statusText}`);
   }
 
