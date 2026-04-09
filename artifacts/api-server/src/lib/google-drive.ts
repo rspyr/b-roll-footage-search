@@ -71,6 +71,23 @@ export async function listVideoFiles(folderId: string): Promise<DriveFile[]> {
   return data.files || [];
 }
 
+export async function getFolderMetadata(folderId: string): Promise<DriveFolder> {
+  const params = new URLSearchParams({
+    fields: "id,name,mimeType",
+  });
+
+  const response = await connectors.proxy("google-drive", `/drive/v3/files/${folderId}?${params.toString()}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get folder metadata: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json() as DriveFolder;
+  return data;
+}
+
 export async function downloadFile(fileId: string, destPath: string): Promise<void> {
   const dir = path.dirname(destPath);
   if (!fs.existsSync(dir)) {
