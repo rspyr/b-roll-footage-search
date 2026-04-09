@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 const requiredEnvVars = [
   { name: "DATABASE_URL", description: "PostgreSQL connection string" },
   { name: "SESSION_SECRET", description: "Secret for signing session cookies" },
+  { name: "GEMINI_API_KEY", description: "Gemini API key for video analysis and embeddings" },
   { name: "AI_INTEGRATIONS_OPENAI_BASE_URL", description: "OpenAI integration base URL" },
   { name: "AI_INTEGRATIONS_OPENAI_API_KEY", description: "OpenAI integration API key" },
 ];
@@ -60,8 +61,38 @@ async function ensureSessionTable() {
   `);
 }
 
+async function ensureVideoSegmentsTable() {
+  const { pool } = await import("@workspace/db");
+  await pool.query(`CREATE EXTENSION IF NOT EXISTS vector;`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS video_segments (
+      id SERIAL PRIMARY KEY,
+      video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+      start_sec DOUBLE PRECISION NOT NULL DEFAULT 0,
+      end_sec DOUBLE PRECISION,
+      embedding vector(768),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    );
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE indexname = 'video_segments_embedding_idx'
+      ) THEN
+        CREATE INDEX video_segments_embedding_idx ON video_segments
+        USING hnsw (embedding vector_cosine_ops);
+      END IF;
+    END$$;
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS video_segments_video_id_idx ON video_segments (video_id);
+  `);
+}
+
 async function start() {
   await ensureSessionTable();
+  await ensureVideoSegmentsTable();
   await resetZombieProcessingVideos();
 
   const { default: app } = await import("./app");

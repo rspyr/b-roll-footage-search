@@ -353,23 +353,23 @@ export async function processVideo(videoId: number): Promise<void> {
     logger.info({ videoId, frameCount: framePaths.length }, "Frames extracted");
 
     logger.info({ videoId }, "Describing frames with Gemini Vision");
-    const frameDescriptions: Array<{ framePath: string; description: string; originalIndex: number }> = [];
+    const frameDescriptions: Array<{ framePath: string; description: string; frameIndex: number }> = [];
 
     let i = 0;
     while (i < framePaths.length) {
       const groupSize = Math.min(3, framePaths.length - i);
       const groupPaths = framePaths.slice(i, i + groupSize);
 
-      let description: string;
+      let groupDescription: string;
       try {
         if (groupSize >= 2) {
-          description = await withRetry(
+          groupDescription = await withRetry(
             () => describeFrameGroup(groupPaths),
             2,
             `describe-frame-group-${i}`
           );
         } else {
-          description = await withRetry(
+          groupDescription = await withRetry(
             () => describeFrame(groupPaths[0]),
             2,
             `describe-frame-${i}`
@@ -378,24 +378,30 @@ export async function processVideo(videoId: number): Promise<void> {
       } catch (err) {
         logger.warn({ videoId, frameIndex: i, err }, "Frame description failed, retrying single frame");
         try {
-          description = await describeFrame(framePaths[i]);
+          groupDescription = await describeFrame(framePaths[i]);
         } catch (retryErr) {
           logger.error({ videoId, frameIndex: i, err: retryErr }, "Frame description retry failed");
-          description = "Description unavailable";
+          groupDescription = "Description unavailable";
         }
       }
 
-      frameDescriptions.push({ framePath: framePaths[i], description, originalIndex: i });
+      for (let j = 0; j < groupSize; j++) {
+        frameDescriptions.push({
+          framePath: framePaths[i + j],
+          description: groupDescription,
+          frameIndex: i + j,
+        });
+      }
       i += groupSize;
 
       await sleep(500);
     }
 
-    for (const { framePath, description, originalIndex } of frameDescriptions) {
+    for (const { framePath, description, frameIndex } of frameDescriptions) {
       const relativePath = path.relative(FRAMES_DIR, framePath);
       await db.insert(framesTable).values({
         videoId,
-        timestampSec: originalIndex * frameInterval,
+        timestampSec: frameIndex * frameInterval,
         imagePath: relativePath,
         description,
       });
