@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, videosTable, framesTable, transcriptionsTable, videoSegmentsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { downloadFile } from "./google-drive";
 import { logger } from "./logger";
 import { gemini } from "./gemini";
@@ -404,7 +404,15 @@ export async function processVideo(videoId: number): Promise<void> {
     return;
   }
 
-  await db.update(videosTable).set({ status: "processing" }).where(eq(videosTable.id, videoId));
+  const claimed = await db.update(videosTable)
+    .set({ status: "processing" })
+    .where(and(eq(videosTable.id, videoId), eq(videosTable.status, "pending")))
+    .returning({ id: videosTable.id });
+
+  if (claimed.length === 0) {
+    logger.info({ videoId, currentStatus: video.status }, "Video no longer pending, skipping processing");
+    return;
+  }
 
   currentProcessingState.videoId = videoId;
   currentProcessingState.videoTitle = video.title;
