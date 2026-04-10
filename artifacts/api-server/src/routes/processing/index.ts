@@ -47,6 +47,11 @@ router.get("/processing-status", async (_req, res): Promise<void> => {
       title: processingState.videoTitle,
       step: processingState.step,
       startedAt: processingState.startedAt,
+      stepStartedAt: processingState.stepStartedAt,
+      current: processingState.current,
+      total: processingState.total,
+      bytesDownloaded: processingState.bytesDownloaded,
+      bytesTotal: processingState.bytesTotal,
     } : null,
   });
 });

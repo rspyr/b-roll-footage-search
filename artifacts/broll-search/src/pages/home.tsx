@@ -5,7 +5,7 @@ import { useGetProcessingStatus, useListVideos, getGetProcessingStatusQueryKey, 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatElapsed, formatProgressLabel } from "@/lib/format";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -99,9 +99,20 @@ export default function Home() {
                     <div className="flex items-center gap-2 text-sm text-amber-500/80 bg-amber-500/5 rounded-md px-3 py-2">
                       <Loader2 size={14} className="animate-spin shrink-0" />
                       <span className="truncate">
-                        <span className="font-medium">{status.currentVideo.step}</span>
+                        <span className="font-medium">
+                          {formatProgressLabel(
+                            status.currentVideo.step || "",
+                            status.currentVideo.current,
+                            status.currentVideo.total,
+                            status.currentVideo.bytesDownloaded,
+                            status.currentVideo.bytesTotal,
+                          )}
+                        </span>
                         {status.currentVideo.title && <span className="text-muted-foreground"> — {status.currentVideo.title}</span>}
                       </span>
+                      {status.currentVideo.stepStartedAt && (
+                        <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">{formatElapsed(status.currentVideo.stepStartedAt)}</span>
+                      )}
                     </div>
                   )}
                 </div>

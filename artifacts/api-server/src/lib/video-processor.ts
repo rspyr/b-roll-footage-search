@@ -27,6 +27,11 @@ interface ProcessingState {
   videoTitle: string | null;
   step: string | null;
   startedAt: number | null;
+  stepStartedAt: number | null;
+  current: number | null;
+  total: number | null;
+  bytesDownloaded: number | null;
+  bytesTotal: number | null;
 }
 
 const currentProcessingState: ProcessingState = {
@@ -34,6 +39,11 @@ const currentProcessingState: ProcessingState = {
   videoTitle: null,
   step: null,
   startedAt: null,
+  stepStartedAt: null,
+  current: null,
+  total: null,
+  bytesDownloaded: null,
+  bytesTotal: null,
 };
 
 const cancelledVideoIds = new Set<number>();
@@ -52,6 +62,21 @@ export function getProcessingState(): ProcessingState {
 
 function updateProcessingStep(step: string) {
   currentProcessingState.step = step;
+  currentProcessingState.stepStartedAt = Date.now();
+  currentProcessingState.current = null;
+  currentProcessingState.total = null;
+  currentProcessingState.bytesDownloaded = null;
+  currentProcessingState.bytesTotal = null;
+}
+
+function updateSubstepProgress(current: number, total: number) {
+  currentProcessingState.current = current;
+  currentProcessingState.total = total;
+}
+
+function updateDownloadProgress(bytesDownloaded: number, bytesTotal: number | null) {
+  currentProcessingState.bytesDownloaded = bytesDownloaded;
+  currentProcessingState.bytesTotal = bytesTotal;
 }
 
 function ensureDirs() {
@@ -246,7 +271,7 @@ interface VideoSegmentInfo {
   filePath: string;
 }
 
-async function segmentVideo(videoPath: string, videoId: number, duration: number): Promise<VideoSegmentInfo[]> {
+async function segmentVideo(videoPath: string, videoId: number, duration: number, onProgress?: (current: number, total: number) => void): Promise<VideoSegmentInfo[]> {
   logger.info({ videoId, duration }, "Starting video segmentation");
   const segDir = path.join(SEGMENTS_DIR, String(videoId));
   if (!fs.existsSync(segDir)) {
@@ -257,6 +282,7 @@ async function segmentVideo(videoPath: string, videoId: number, duration: number
   const videoSizeMB = videoStats.size / (1024 * 1024);
 
   if (duration <= MAX_EMBED_DURATION && videoSizeMB <= MAX_SEGMENT_FILE_SIZE_MB) {
+    if (onProgress) onProgress(1, 1);
     return [{ startSec: 0, endSec: duration, filePath: videoPath }];
   }
 
@@ -271,7 +297,11 @@ async function segmentVideo(videoPath: string, videoId: number, duration: number
   const segments: VideoSegmentInfo[] = [];
   let startSec = 0;
 
+  const stepSize = effectiveSegDuration - SEGMENT_OVERLAP;
+  const estimatedTotal = Math.max(1, Math.ceil(duration / Math.max(stepSize, 1)));
+
   while (startSec < duration) {
+    if (onProgress) onProgress(segments.length, estimatedTotal);
     const endSec = Math.min(startSec + effectiveSegDuration, duration);
     const segmentPath = path.join(segDir, `segment_${String(segments.length).padStart(4, "0")}.mp4`);
 
@@ -290,6 +320,8 @@ async function segmentVideo(videoPath: string, videoId: number, duration: number
     startSec = endSec - SEGMENT_OVERLAP;
     if (endSec >= duration) break;
   }
+
+  if (onProgress) onProgress(segments.length, segments.length);
 
   return segments;
 }
@@ -434,7 +466,9 @@ export async function processVideo(videoId: number): Promise<void> {
       updateProcessingStep("Downloading from Drive");
       videoPath = path.join(VIDEOS_DIR, `${videoId}_${video.title.replace(/[^a-zA-Z0-9._-]/g, "_")}`);
       logger.info({ videoId, driveFileId: video.driveFileId }, "Downloading video from Drive");
-      await downloadFile(video.driveFileId, videoPath);
+      await downloadFile(video.driveFileId, videoPath, (bytesDownloaded, bytesTotal) => {
+        updateDownloadProgress(bytesDownloaded, bytesTotal);
+      });
       await db.update(videosTable).set({ localPath: videoPath }).where(eq(videosTable.id, videoId));
     }
 
@@ -461,10 +495,12 @@ export async function processVideo(videoId: number): Promise<void> {
     updateProcessingStep("Analyzing frames");
     logger.info({ videoId }, "Describing frames with Gemini Vision");
     const frameDescriptions: Array<{ framePath: string; description: string; frameIndex: number }> = [];
+    let framesAnalyzed = 0;
 
     let i = 0;
     while (i < framePaths.length) {
       checkCancellation(videoId);
+      updateSubstepProgress(framesAnalyzed, framePaths.length);
       const groupSize = Math.min(3, framePaths.length - i);
       const groupPaths = framePaths.slice(i, i + groupSize);
 
@@ -501,6 +537,8 @@ export async function processVideo(videoId: number): Promise<void> {
         });
       }
       i += groupSize;
+      framesAnalyzed = i;
+      updateSubstepProgress(framesAnalyzed, framePaths.length);
 
       await sleep(500);
     }
@@ -508,7 +546,9 @@ export async function processVideo(videoId: number): Promise<void> {
     checkCancellation(videoId);
     updateProcessingStep("Uploading frames");
     logger.info({ videoId }, "Uploading frames to object storage");
-    for (const { framePath, description, frameIndex } of frameDescriptions) {
+    for (let fi = 0; fi < frameDescriptions.length; fi++) {
+      const { framePath, description, frameIndex } = frameDescriptions[fi];
+      updateSubstepProgress(fi, frameDescriptions.length);
       const relativePath = path.relative(FRAMES_DIR, framePath);
       await uploadFrame(framePath, relativePath);
       await db.insert(framesTable).values({
@@ -518,6 +558,7 @@ export async function processVideo(videoId: number): Promise<void> {
         description,
       });
     }
+    updateSubstepProgress(frameDescriptions.length, frameDescriptions.length);
     logger.info({ videoId, describedCount: frameDescriptions.length }, "Frame descriptions saved");
 
     const localFramesDir = path.join(FRAMES_DIR, String(videoId));
@@ -551,14 +592,19 @@ export async function processVideo(videoId: number): Promise<void> {
     }
 
     checkCancellation(videoId);
-    updateProcessingStep("Generating embeddings");
+    updateProcessingStep("Segmenting video");
     logger.info({ videoId }, "Segmenting video and generating embeddings");
     try {
-      const videoSegments = await segmentVideo(videoPath, videoId, duration);
+      const videoSegments = await segmentVideo(videoPath, videoId, duration, (current, total) => {
+        updateSubstepProgress(current, total);
+      });
       logger.info({ videoId, segmentCount: videoSegments.length }, "Video segmented");
 
-      for (const seg of videoSegments) {
+      updateProcessingStep("Generating embeddings");
+      for (let si = 0; si < videoSegments.length; si++) {
+        const seg = videoSegments[si];
         checkCancellation(videoId);
+        updateSubstepProgress(si, videoSegments.length);
         try {
           const embedding = await embedVideoSegment(seg);
 
@@ -577,6 +623,7 @@ export async function processVideo(videoId: number): Promise<void> {
 
         await sleep(1000);
       }
+      updateSubstepProgress(videoSegments.length, videoSegments.length);
 
       const segDir = path.join(SEGMENTS_DIR, String(videoId));
       if (fs.existsSync(segDir)) {
@@ -614,6 +661,11 @@ export async function processVideo(videoId: number): Promise<void> {
     currentProcessingState.videoTitle = null;
     currentProcessingState.step = null;
     currentProcessingState.startedAt = null;
+    currentProcessingState.stepStartedAt = null;
+    currentProcessingState.current = null;
+    currentProcessingState.total = null;
+    currentProcessingState.bytesDownloaded = null;
+    currentProcessingState.bytesTotal = null;
 
     logger.info({ videoId }, "Video processing completed");
   } catch (err) {
@@ -621,6 +673,11 @@ export async function processVideo(videoId: number): Promise<void> {
     currentProcessingState.videoTitle = null;
     currentProcessingState.step = null;
     currentProcessingState.startedAt = null;
+    currentProcessingState.stepStartedAt = null;
+    currentProcessingState.current = null;
+    currentProcessingState.total = null;
+    currentProcessingState.bytesDownloaded = null;
+    currentProcessingState.bytesTotal = null;
 
     if (err instanceof CancellationError) {
       cancelledVideoIds.delete(videoId);

@@ -17,6 +17,34 @@ export function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
+export function formatElapsed(startMs: number): string {
+  const elapsed = Math.floor((Date.now() - startMs) / 1000);
+  if (elapsed < 60) return `${elapsed}s`;
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  return `${m}m ${s}s`;
+}
+
+export function formatProgressLabel(
+  step: string,
+  current?: number | null,
+  total?: number | null,
+  bytesDownloaded?: number | null,
+  bytesTotal?: number | null,
+): string {
+  if (bytesDownloaded != null) {
+    const dl = formatBytes(bytesDownloaded);
+    if (bytesTotal != null && bytesTotal > 0) {
+      return `${step} — ${dl} / ${formatBytes(bytesTotal)}`;
+    }
+    return `${step} — ${dl}`;
+  }
+  if (current != null && total != null) {
+    return `${step} (${current}/${total})`;
+  }
+  return step;
+}
+
 export function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   return new Intl.DateTimeFormat('en-US', {

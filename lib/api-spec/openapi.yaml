@@ -701,6 +701,21 @@ components:
               type: string
             startedAt:
               type: number
+            stepStartedAt:
+              type: number
+              nullable: true
+            current:
+              type: integer
+              nullable: true
+            total:
+              type: integer
+              nullable: true
+            bytesDownloaded:
+              type: integer
+              nullable: true
+            bytesTotal:
+              type: integer
+              nullable: true
       required:
         - pending
         - processing

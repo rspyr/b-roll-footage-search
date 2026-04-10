@@ -242,6 +242,11 @@ export const GetProcessingStatusResponse = zod.object({
       title: zod.string().optional(),
       step: zod.string().optional(),
       startedAt: zod.number().optional(),
+      stepStartedAt: zod.number().nullish(),
+      current: zod.number().nullish(),
+      total: zod.number().nullish(),
+      bytesDownloaded: zod.number().nullish(),
+      bytesTotal: zod.number().nullish(),
     })
     .nullish(),
 });

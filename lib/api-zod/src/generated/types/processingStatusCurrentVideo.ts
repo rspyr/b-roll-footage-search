@@ -11,4 +11,9 @@ export type ProcessingStatusCurrentVideo = {
   title?: string;
   step?: string;
   startedAt?: number;
+  stepStartedAt?: number | null;
+  current?: number | null;
+  total?: number | null;
+  bytesDownloaded?: number | null;
+  bytesTotal?: number | null;
 } | null;

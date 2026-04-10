@@ -53,7 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatDuration, formatBytes, formatDate } from "@/lib/format";
+import { formatDuration, formatBytes, formatDate, formatElapsed, formatProgressLabel } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -307,13 +307,24 @@ export default function Library() {
               <div className="flex items-center gap-3 bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3">
                 <Loader2 size={16} className="animate-spin text-amber-500 shrink-0" />
                 <span className="text-sm">
-                  <span className="font-medium text-amber-500">{status.currentVideo.step}</span>
+                  <span className="font-medium text-amber-500">
+                    {formatProgressLabel(
+                      status.currentVideo.step || "",
+                      status.currentVideo.current,
+                      status.currentVideo.total,
+                      status.currentVideo.bytesDownloaded,
+                      status.currentVideo.bytesTotal,
+                    )}
+                  </span>
                   {status.currentVideo.title && (
                     <span className="text-muted-foreground"> — {status.currentVideo.title}</span>
                   )}
                 </span>
-                <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
-                  {status.completed} of {status.total} done
+                <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap flex items-center gap-2">
+                  {status.currentVideo.stepStartedAt && (
+                    <span>{formatElapsed(status.currentVideo.stepStartedAt)}</span>
+                  )}
+                  <span>{status.completed} of {status.total} done</span>
                 </span>
               </div>
             )}

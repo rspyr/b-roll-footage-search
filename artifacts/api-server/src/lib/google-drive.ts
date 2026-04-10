@@ -2,7 +2,7 @@ import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
 import fs from "fs";
 import path from "path";
-import { Readable } from "stream";
+import { Readable, Transform } from "stream";
 import { pipeline } from "stream/promises";
 
 const connectors = new ReplitConnectors();
@@ -113,7 +113,9 @@ export async function getFolderMetadata(folderId: string): Promise<DriveFolder> 
   return data;
 }
 
-export async function downloadFile(fileId: string, destPath: string): Promise<void> {
+export type DownloadProgressCallback = (bytesDownloaded: number, bytesTotal: number | null) => void;
+
+export async function downloadFile(fileId: string, destPath: string, onProgress?: DownloadProgressCallback): Promise<void> {
   const dir = path.dirname(destPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -133,9 +135,25 @@ export async function downloadFile(fileId: string, destPath: string): Promise<vo
     throw new Error(`No response body for file ${fileId}`);
   }
 
+  const contentLength = response.headers.get("content-length");
+  const bytesTotal = contentLength ? parseInt(contentLength, 10) : null;
+
   const nodeStream = Readable.fromWeb(body as import("stream/web").ReadableStream);
   const writeStream = fs.createWriteStream(destPath);
-  await pipeline(nodeStream, writeStream);
+
+  if (onProgress) {
+    let bytesDownloaded = 0;
+    const progressStream = new Transform({
+      transform(chunk, _encoding, callback) {
+        bytesDownloaded += chunk.length;
+        onProgress(bytesDownloaded, bytesTotal);
+        callback(null, chunk);
+      },
+    });
+    await pipeline(nodeStream, progressStream, writeStream);
+  } else {
+    await pipeline(nodeStream, writeStream);
+  }
 
   const stats = fs.statSync(destPath);
   logger.info({ fileId, destPath, size: stats.size }, "Downloaded file from Google Drive");
