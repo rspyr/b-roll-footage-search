@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Search, PlayCircle, HardDrive, Loader2, Video } from "lucide-react";
+import { Search, PlayCircle, Loader2, Video } from "lucide-react";
 import { useGetProcessingStatus, useListVideos, getGetProcessingStatusQueryKey, getListVideosQueryKey } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -82,24 +82,32 @@ export default function Home() {
               <div className="text-2xl font-bold">{status?.completed || 0} processed</div>
             </CardContent>
           </Card>
-          <Card className="bg-card">
+          <Card className="bg-card md:col-span-2">
             <CardHeader className="py-4 px-5 border-b border-border/50">
               <CardTitle className="text-sm font-medium flex items-center gap-2 text-amber-500">
-                <Loader2 size={16} className={hasActiveProcessing ? "animate-spin" : ""} /> Processing
+                <Loader2 size={16} className={hasActiveProcessing ? "animate-spin" : ""} /> Ingestion Queue
               </CardTitle>
             </CardHeader>
             <CardContent className="py-4 px-5">
-              <div className="text-2xl font-bold">{status?.processing || 0} active</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card">
-            <CardHeader className="py-4 px-5 border-b border-border/50">
-              <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-                <HardDrive size={16} /> Pending
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="py-4 px-5">
-              <div className="text-2xl font-bold">{status?.pending || 0} queued</div>
+              {hasActiveProcessing ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold">{(status?.processing || 0) + (status?.pending || 0)} remaining</span>
+                    <span className="text-sm text-muted-foreground">{status?.processing || 0} active &middot; {status?.pending || 0} queued</span>
+                  </div>
+                  {status?.currentVideo && (
+                    <div className="flex items-center gap-2 text-sm text-amber-500/80 bg-amber-500/5 rounded-md px-3 py-2">
+                      <Loader2 size={14} className="animate-spin shrink-0" />
+                      <span className="truncate">
+                        <span className="font-medium">{status.currentVideo.step}</span>
+                        {status.currentVideo.title && <span className="text-muted-foreground"> — {status.currentVideo.title}</span>}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-2xl font-bold text-muted-foreground">All done</div>
+              )}
             </CardContent>
           </Card>
         </div>

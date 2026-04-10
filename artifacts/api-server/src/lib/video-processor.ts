@@ -22,6 +22,28 @@ const SEGMENT_OVERLAP = 10;
 const MAX_EMBED_DURATION = 120;
 const MAX_SEGMENT_FILE_SIZE_MB = 50;
 
+interface ProcessingState {
+  videoId: number | null;
+  videoTitle: string | null;
+  step: string | null;
+  startedAt: number | null;
+}
+
+const currentProcessingState: ProcessingState = {
+  videoId: null,
+  videoTitle: null,
+  step: null,
+  startedAt: null,
+};
+
+export function getProcessingState(): ProcessingState {
+  return { ...currentProcessingState };
+}
+
+function updateProcessingStep(step: string) {
+  currentProcessingState.step = step;
+}
+
 function ensureDirs() {
   for (const dir of [DATA_DIR, VIDEOS_DIR, FRAMES_DIR, SEGMENTS_DIR]) {
     if (!fs.existsSync(dir)) {
@@ -354,6 +376,11 @@ export async function processVideo(videoId: number): Promise<void> {
 
   await db.update(videosTable).set({ status: "processing" }).where(eq(videosTable.id, videoId));
 
+  currentProcessingState.videoId = videoId;
+  currentProcessingState.videoTitle = video.title;
+  currentProcessingState.startedAt = Date.now();
+  updateProcessingStep("Preparing");
+
   await db.delete(framesTable).where(eq(framesTable.videoId, videoId));
   await db.delete(transcriptionsTable).where(eq(transcriptionsTable.videoId, videoId));
   await db.delete(videoSegmentsTable).where(eq(videoSegmentsTable.videoId, videoId));
@@ -364,6 +391,7 @@ export async function processVideo(videoId: number): Promise<void> {
   try {
 
     if (!videoPath || !fs.existsSync(videoPath)) {
+      updateProcessingStep("Downloading from Drive");
       videoPath = path.join(VIDEOS_DIR, `${videoId}_${video.title.replace(/[^a-zA-Z0-9._-]/g, "_")}`);
       logger.info({ videoId, driveFileId: video.driveFileId }, "Downloading video from Drive");
       await downloadFile(video.driveFileId, videoPath);
@@ -375,6 +403,7 @@ export async function processVideo(videoId: number): Promise<void> {
     logger.info({ videoId, duration }, "Got video duration");
 
     const frameInterval = duration <= 30 ? 2 : (duration > 120 ? 10 : 5);
+    updateProcessingStep("Extracting frames");
     logger.info({ videoId, frameInterval, duration }, "Extracting frames");
     let framePaths = await extractFrames(videoPath, videoId, frameInterval);
     logger.info({ videoId, frameCount: framePaths.length }, "Frames extracted");
@@ -387,6 +416,7 @@ export async function processVideo(videoId: number): Promise<void> {
       framePaths = sampledPaths;
     }
 
+    updateProcessingStep("Analyzing frames");
     logger.info({ videoId }, "Describing frames with Gemini Vision");
     const frameDescriptions: Array<{ framePath: string; description: string; frameIndex: number }> = [];
 
@@ -432,6 +462,7 @@ export async function processVideo(videoId: number): Promise<void> {
       await sleep(500);
     }
 
+    updateProcessingStep("Uploading frames");
     logger.info({ videoId }, "Uploading frames to object storage");
     for (const { framePath, description, frameIndex } of frameDescriptions) {
       const relativePath = path.relative(FRAMES_DIR, framePath);
@@ -450,6 +481,7 @@ export async function processVideo(videoId: number): Promise<void> {
       fs.rmSync(localFramesDir, { recursive: true, force: true });
     }
 
+    updateProcessingStep("Transcribing audio");
     logger.info({ videoId }, "Extracting and transcribing audio");
     try {
       const audioPath = await extractAudio(videoPath, videoId);
@@ -472,6 +504,7 @@ export async function processVideo(videoId: number): Promise<void> {
       logger.warn({ videoId, err }, "Audio extraction/transcription failed, continuing without transcription");
     }
 
+    updateProcessingStep("Generating embeddings");
     logger.info({ videoId }, "Segmenting video and generating embeddings");
     try {
       const videoSegments = await segmentVideo(videoPath, videoId, duration);
@@ -523,8 +556,18 @@ export async function processVideo(videoId: number): Promise<void> {
       }
     }
 
+    currentProcessingState.videoId = null;
+    currentProcessingState.videoTitle = null;
+    currentProcessingState.step = null;
+    currentProcessingState.startedAt = null;
+
     logger.info({ videoId }, "Video processing completed");
   } catch (err) {
+    currentProcessingState.videoId = null;
+    currentProcessingState.videoTitle = null;
+    currentProcessingState.step = null;
+    currentProcessingState.startedAt = null;
+
     logger.error({ videoId, err }, "Video processing failed");
     await db.update(videosTable).set({
       status: "failed",

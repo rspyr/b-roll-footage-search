@@ -238,37 +238,53 @@ export default function Library() {
         </div>
 
         {status && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
-              <span className="text-sm font-medium text-muted-foreground">
-                Total
-              </span>
-              <span className="text-2xl font-bold">{status.total}</span>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total
+                </span>
+                <span className="text-2xl font-bold">{status.total}</span>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
+                <span className="text-sm font-medium text-green-500">
+                  Completed
+                </span>
+                <span className="text-2xl font-bold">{status.completed}</span>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
+                <span className="text-sm font-medium text-amber-500">
+                  Processing
+                </span>
+                <span className="text-2xl font-bold">{status.processing}</span>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Pending
+                </span>
+                <span className="text-2xl font-bold">{status.pending}</span>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
+                <span className="text-sm font-medium text-red-500">
+                  Failed
+                </span>
+                <span className="text-2xl font-bold">{status.failed}</span>
+              </div>
             </div>
-            <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
-              <span className="text-sm font-medium text-green-500">
-                Completed
-              </span>
-              <span className="text-2xl font-bold">{status.completed}</span>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
-              <span className="text-sm font-medium text-amber-500">
-                Processing
-              </span>
-              <span className="text-2xl font-bold">{status.processing}</span>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
-              <span className="text-sm font-medium text-muted-foreground">
-                Pending
-              </span>
-              <span className="text-2xl font-bold">{status.pending}</span>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4 flex flex-col justify-center">
-              <span className="text-sm font-medium text-red-500">
-                Failed
-              </span>
-              <span className="text-2xl font-bold">{status.failed}</span>
-            </div>
+            {hasActiveProcessing && status.currentVideo && (
+              <div className="flex items-center gap-3 bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3">
+                <Loader2 size={16} className="animate-spin text-amber-500 shrink-0" />
+                <span className="text-sm">
+                  <span className="font-medium text-amber-500">{status.currentVideo.step}</span>
+                  {status.currentVideo.title && (
+                    <span className="text-muted-foreground"> — {status.currentVideo.title}</span>
+                  )}
+                </span>
+                <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
+                  {status.completed} of {status.total} done
+                </span>
+              </div>
+            )}
           </div>
         )}
 

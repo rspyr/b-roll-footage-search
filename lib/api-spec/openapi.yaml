@@ -666,6 +666,18 @@ components:
           type: integer
         total:
           type: integer
+        currentVideo:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+            step:
+              type: string
+            startedAt:
+              type: number
       required:
         - pending
         - processing

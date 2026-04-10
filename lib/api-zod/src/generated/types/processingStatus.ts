@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ProcessingStatusCurrentVideo } from "./processingStatusCurrentVideo";
 
 export interface ProcessingStatus {
   pending: number;
@@ -12,4 +13,5 @@ export interface ProcessingStatus {
   completed: number;
   failed: number;
   total: number;
+  currentVideo?: ProcessingStatusCurrentVideo;
 }

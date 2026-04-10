@@ -142,12 +142,20 @@ export interface ProcessingResponse {
   status: string;
 }
 
+export type ProcessingStatusCurrentVideo = {
+  id?: number;
+  title?: string;
+  step?: string;
+  startedAt?: number;
+} | null;
+
 export interface ProcessingStatus {
   pending: number;
   processing: number;
   completed: number;
   failed: number;
   total: number;
+  currentVideo?: ProcessingStatusCurrentVideo;
 }
 
 export interface SyncedFolder {

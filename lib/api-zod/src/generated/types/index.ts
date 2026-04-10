@@ -20,6 +20,7 @@ export * from "./listVideosParams";
 export * from "./listVideosStatus";
 export * from "./processingResponse";
 export * from "./processingStatus";
+export * from "./processingStatusCurrentVideo";
 export * from "./searchContentParams";
 export * from "./searchContentType";
 export * from "./searchResult";

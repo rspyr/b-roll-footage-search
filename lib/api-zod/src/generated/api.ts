@@ -209,6 +209,14 @@ export const GetProcessingStatusResponse = zod.object({
   completed: zod.number(),
   failed: zod.number(),
   total: zod.number(),
+  currentVideo: zod
+    .object({
+      id: zod.number().optional(),
+      title: zod.string().optional(),
+      step: zod.string().optional(),
+      startedAt: zod.number().optional(),
+    })
+    .nullish(),
 });
 
 /**

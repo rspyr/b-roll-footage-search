@@ -1,10 +1,13 @@
 import { Router, type IRouter } from "express";
 import { sql } from "drizzle-orm";
 import { db, videosTable } from "@workspace/db";
+import { getProcessingState } from "../../lib/video-processor";
 
 const router: IRouter = Router();
 
 router.get("/processing-status", async (_req, res): Promise<void> => {
+  res.set("Cache-Control", "no-cache, no-store");
+  res.removeHeader("ETag");
   const result = await db.execute(sql`
     SELECT
       COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -16,12 +19,20 @@ router.get("/processing-status", async (_req, res): Promise<void> => {
   `);
 
   const row = result.rows[0];
+  const processingState = getProcessingState();
+
   res.json({
     pending: Number(row.pending),
     processing: Number(row.processing),
     completed: Number(row.completed),
     failed: Number(row.failed),
     total: Number(row.total),
+    currentVideo: processingState.videoId ? {
+      id: processingState.videoId,
+      title: processingState.videoTitle,
+      step: processingState.step,
+      startedAt: processingState.startedAt,
+    } : null,
   });
 });
 
