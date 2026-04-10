@@ -97,8 +97,19 @@ async function start() {
 
   const { default: app } = await import("./app");
 
-  app.listen(port, () => {
+  app.listen(port, async () => {
     logger.info({ port }, "Server listening");
+
+    const { db, videosTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+    const pending = await db.select({ id: videosTable.id }).from(videosTable).where(eq(videosTable.status, "pending")).limit(1);
+    if (pending.length > 0) {
+      logger.info("Found pending videos, starting processing queue");
+      const { startProcessingQueue } = await import("./lib/video-processor");
+      startProcessingQueue().catch((err) => {
+        logger.error({ err }, "Background processing queue failed");
+      });
+    }
   });
 }
 
