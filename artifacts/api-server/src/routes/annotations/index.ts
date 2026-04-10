@@ -50,7 +50,7 @@ router.post("/videos/:id/annotations", async (req, res): Promise<void> => {
     return;
   }
 
-  const userId = (req.session as any).userId as number;
+  const userId = req.session.userId;
 
   try {
     const video = await db.select().from(videosTable).where(eq(videosTable.id, videoId)).limit(1);

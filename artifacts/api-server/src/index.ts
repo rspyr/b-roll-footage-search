@@ -91,9 +91,39 @@ async function ensureVideoSegmentsTable() {
   `);
 }
 
+async function ensureFeedbackTables() {
+  const { pool } = await import("@workspace/db");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS search_feedback (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+      query TEXT NOT NULL,
+      feedback_type TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS search_feedback_video_id_idx ON search_feedback (video_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS search_feedback_query_tsv_idx ON search_feedback USING gin (to_tsvector('english', query));`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS video_annotations (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS video_annotations_video_id_idx ON video_annotations (video_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS video_annotations_content_tsv_idx ON video_annotations USING gin (to_tsvector('english', content));`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS video_annotations_content_trgm_idx ON video_annotations USING gin (lower(content) gin_trgm_ops);`);
+}
+
 async function start() {
   await ensureSessionTable();
   await ensureVideoSegmentsTable();
+  await ensureFeedbackTables();
   await resetZombieProcessingVideos();
 
   const { default: app } = await import("./app");

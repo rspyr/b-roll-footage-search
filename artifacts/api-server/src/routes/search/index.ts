@@ -524,7 +524,7 @@ router.post("/search/feedback", async (req, res): Promise<void> => {
     return;
   }
 
-  const userId = (req.session as any).userId as number;
+  const userId = req.session.userId;
   const normalizedQuery = String(query).trim().toLowerCase();
 
   if (!normalizedQuery) {
