@@ -11,13 +11,48 @@ import {
   getGetAnnotationStatusQueryKey,
 } from "@workspace/api-client-react";
 import type { AnnotationItem, GetAnnotationStatus200 } from "@workspace/api-client-react";
-import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X } from "lucide-react";
+import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { formatDuration } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
+
+const CARD_SIZE_KEY = "broll-search-card-size";
+const DEFAULT_CARD_SIZE = 0;
+
+function useCardSize() {
+  const [size, setSize] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem(CARD_SIZE_KEY);
+      if (stored !== null) {
+        const val = Number(stored);
+        if (!isNaN(val) && val >= 0 && val <= 100) return val;
+      }
+    } catch {}
+    return DEFAULT_CARD_SIZE;
+  });
+
+  const updateSize = useCallback((val: number) => {
+    setSize(val);
+    try {
+      localStorage.setItem(CARD_SIZE_KEY, String(val));
+    } catch {}
+  }, []);
+
+  return [size, updateSize] as const;
+}
+
+function getGridConfig(sliderValue: number) {
+  const t = sliderValue / 100;
+  const scale = 1 - t * 0.45;
+  const fontSize = scale;
+  const padding = scale;
+  const lineClamp = t > 0.7 ? 2 : 3;
+  return { scale, fontSize, padding, lineClamp };
+}
 
 interface SearchResultItem {
   videoId: number;
@@ -219,12 +254,14 @@ function SearchResults({
   query,
   onNavigate,
   searchString,
+  cardSize,
 }: {
   results: SearchResultItem[];
   total: number;
   query: string;
   onNavigate: (path: string) => void;
   searchString: string;
+  cardSize: number;
 }) {
   const maxRank = useMemo(() => {
     if (results.length === 0) return 0;
@@ -256,13 +293,26 @@ function SearchResults({
     feedbackMutation.mutate({ data: { videoId, query, feedbackType: type } });
   };
 
+  const config = useMemo(() => getGridConfig(cardSize), [cardSize]);
+  const t = cardSize / 100;
+  const minColWidth = Math.round(420 - t * 270);
+  const gap = Math.round(24 - t * 12);
+  const iconSize = Math.max(10, Math.round(14 * config.scale));
+  const badgeIconSize = Math.max(9, Math.round(12 * config.scale));
+
   return (
     <>
       <div className="text-sm text-muted-foreground">
         Found {total} results for &ldquo;{query}&rdquo;
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(auto-fill, minmax(${minColWidth}px, 1fr))`,
+          gap: `${gap}px`,
+        }}
+      >
         {results.map((result, i) => {
           const statusMap = annotationStatus as GetAnnotationStatus200 | undefined;
           const hasAnnotations = statusMap && statusMap[String(result.videoId)] > 0;
@@ -287,7 +337,13 @@ function SearchResults({
               />
               
               <div className="absolute bottom-2 left-2 flex gap-2">
-                <span className="bg-black/80 px-2 py-1 rounded text-xs font-mono text-white flex items-center gap-1">
+                <span
+                  className="bg-black/80 rounded font-mono text-white flex items-center gap-1"
+                  style={{
+                    fontSize: `${Math.max(9, Math.round(12 * config.fontSize))}px`,
+                    padding: `${Math.round(4 * config.padding)}px ${Math.round(8 * config.padding)}px`,
+                  }}
+                >
                   {formatDuration(result.timestampSec)}
                   {result.endSec && ` - ${formatDuration(result.endSec)}`}
                 </span>
@@ -347,34 +403,65 @@ function SearchResults({
                   className="p-1.5 rounded-md bg-black/60 hover:bg-black/80 text-white transition-colors"
                   title="View details"
                 >
-                  <Info size={14} />
+                  <Info size={iconSize} />
                 </button>
-                <span className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 shadow-sm
-                  ${result.type === 'frame' ? 'bg-blue-500/90 text-white' : 'bg-purple-500/90 text-white'}`}>
-                  {result.type === 'frame' ? <ImageIcon size={12}/> : <Mic size={12}/>}
+                <span
+                  className={`rounded font-medium flex items-center gap-1 shadow-sm
+                    ${result.type === 'frame' ? 'bg-blue-500/90 text-white' : 'bg-purple-500/90 text-white'}`}
+                  style={{
+                    fontSize: `${Math.max(9, Math.round(12 * config.fontSize))}px`,
+                    padding: `${Math.round(4 * config.padding)}px ${Math.round(8 * config.padding)}px`,
+                  }}
+                >
+                  {result.type === 'frame' ? <ImageIcon size={badgeIconSize}/> : <Mic size={badgeIconSize}/>}
                   {result.type === 'frame' ? 'Visual' : 'Audio'}
                 </span>
               </div>
             </div>
             
-            <div className="p-4 flex flex-col flex-1">
-              <h3 className="font-medium text-sm truncate mb-2 text-primary hover:underline">{result.videoTitle}</h3>
-              <p className="text-sm text-muted-foreground line-clamp-3 flex-1 italic">
+            <div
+              className="flex flex-col flex-1"
+              style={{ padding: `${Math.round(16 * config.padding)}px` }}
+            >
+              <h3
+                className="font-medium truncate text-primary hover:underline"
+                style={{
+                  fontSize: `${Math.max(11, Math.round(14 * config.fontSize))}px`,
+                  marginBottom: `${Math.round(8 * config.padding)}px`,
+                }}
+              >
+                {result.videoTitle}
+              </h3>
+              <p
+                className="text-muted-foreground flex-1 italic"
+                style={{
+                  fontSize: `${Math.max(11, Math.round(14 * config.fontSize))}px`,
+                  display: "-webkit-box",
+                  WebkitLineClamp: config.lineClamp,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
                 &ldquo;{result.content}&rdquo;
               </p>
               
-              <div className="mt-3">
+              <div style={{ marginTop: `${Math.round(12 * config.padding)}px` }}>
                 <RelevanceBar rank={result.rank} maxRank={maxRank} />
               </div>
               
-              <div className="mt-3 flex items-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors group"
+              <div
+                className="flex items-center font-medium text-muted-foreground hover:text-primary transition-colors group"
+                style={{
+                  marginTop: `${Math.round(12 * config.padding)}px`,
+                  fontSize: `${Math.max(10, Math.round(12 * config.fontSize))}px`,
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   const searchUrl = "/search" + (searchString.startsWith("?") ? searchString : `?${searchString}`);
                   onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}&from=${encodeURIComponent(searchUrl)}`);
                 }}
               >
-                View details <ArrowRight size={14} className="ml-1 group-hover:translate-x-1 transition-transform" />
+                View details <ArrowRight size={iconSize} className="ml-1 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
 
@@ -398,6 +485,7 @@ export default function SearchPage() {
 
   const [query, setQuery] = useState(q);
   const [type, setType] = useState<"all" | "visual" | "audio">(typeParam);
+  const [cardSize, setCardSize] = useCardSize();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
@@ -491,6 +579,18 @@ export default function SearchPage() {
               <TabsTrigger value="audio"><Mic size={14} className="mr-2"/> Audio</TabsTrigger>
             </TabsList>
           </Tabs>
+          <div className="hidden md:flex items-center gap-2 min-w-[140px]">
+            <Grid2x2 size={14} className="text-muted-foreground shrink-0" />
+            <Slider
+              value={[cardSize]}
+              onValueChange={(v) => setCardSize(v[0] ?? DEFAULT_CARD_SIZE)}
+              min={0}
+              max={100}
+              step={1}
+              className="w-[100px]"
+            />
+            <Grid3x3 size={14} className="text-muted-foreground shrink-0" />
+          </div>
         </div>
       </div>
 
@@ -518,6 +618,7 @@ export default function SearchPage() {
               query={q}
               onNavigate={setLocation}
               searchString={searchString}
+              cardSize={cardSize}
             />
           ) : isFetching ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
