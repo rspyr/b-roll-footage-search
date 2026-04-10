@@ -82,7 +82,8 @@ app.use(
 const FRAMES_DIR = path.join(process.cwd(), "data", "frames");
 
 app.get("/api/frames/{*path}", requireAuth, async (req, res): Promise<void> => {
-  const imagePath = (req.params as { path: string }).path;
+  const rawPath = (req.params as { path: string | string[] }).path;
+  const imagePath = Array.isArray(rawPath) ? rawPath.join("/") : rawPath;
   if (!imagePath || imagePath.includes("..") || path.isAbsolute(imagePath)) {
     res.status(400).send("Invalid path");
     return;
