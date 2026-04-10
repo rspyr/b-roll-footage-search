@@ -219,37 +219,75 @@ export default function SearchPage() {
 
   const [query, setQuery] = useState(q);
   const [type, setType] = useState<"all" | "visual" | "audio">(typeParam);
-  
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
   useEffect(() => {
     setQuery(q);
     setType(typeParam);
   }, [q, typeParam]);
 
   const searchParams2 = { q, type: type === "all" ? undefined : type, limit: 50 };
-  const { data: searchData, isLoading } = useSearchContent(
+  const { data: searchData, isLoading, isFetching } = useSearchContent(
     searchParams2,
     { query: { enabled: !!q, queryKey: getSearchContentQueryKey(searchParams2) } }
   );
 
+  useEffect(() => {
+    if (searchData && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+    }
+  }, [searchData, hasLoadedOnce]);
+
+  const updateUrl = useCallback((value: string, currentType: "all" | "visual" | "audio") => {
+    const trimmed = value.trim();
+    if (trimmed) {
+      const newParams = new URLSearchParams();
+      newParams.set("q", trimmed);
+      if (currentType !== "all") newParams.set("type", currentType);
+      setLocation(`/search?${newParams.toString()}`);
+    } else {
+      setLocation("/search");
+    }
+  }, [setLocation]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      updateUrl(value, type);
+    }, 350);
+  }, [type, updateUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (query.trim()) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    updateUrl(query, type);
+  };
+
+  const handleTypeChange = (newType: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const trimmed = query.trim();
+    const castType = newType as "all" | "visual" | "audio";
+    setType(castType);
+    if (trimmed) {
       const newParams = new URLSearchParams();
-      newParams.set("q", query.trim());
-      if (type !== "all") newParams.set("type", type);
+      newParams.set("q", trimmed);
+      if (castType !== "all") newParams.set("type", castType);
       setLocation(`/search?${newParams.toString()}`);
     }
   };
 
-  const handleTypeChange = (newType: string) => {
-    const newParams = new URLSearchParams(searchString);
-    if (newType === "all") {
-      newParams.delete("type");
-    } else {
-      newParams.set("type", newType);
-    }
-    setLocation(`/search?${newParams.toString()}`);
-  };
+  const hasResults = searchData && searchData.results.length > 0;
+  const showFullSpinner = isLoading && !hasLoadedOnce;
+  const showInlineLoading = isFetching && hasLoadedOnce && !showFullSpinner;
 
   return (
     <div className="flex flex-col h-full">
@@ -259,10 +297,13 @@ export default function SearchPage() {
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
             <Input 
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={handleInputChange}
               placeholder="Search..." 
-              className="w-full pl-10 pr-4 bg-background"
+              className="w-full pl-10 pr-10 bg-background"
             />
+            {showInlineLoading && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" size={16} />
+            )}
           </form>
           <Tabs value={type} onValueChange={handleTypeChange} className="w-full md:w-auto">
             <TabsList className="grid grid-cols-3 md:w-[300px]">
@@ -276,22 +317,22 @@ export default function SearchPage() {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-6xl mx-auto space-y-6">
-          {!q ? (
+          {!q && !query.trim() ? (
             <div className="text-center py-20 text-muted-foreground">
               <SearchIcon size={48} className="mx-auto mb-4 opacity-20" />
               <h2 className="text-lg font-medium">Enter a search query</h2>
               <p>Find visual moments or spoken words in your videos.</p>
             </div>
-          ) : isLoading ? (
+          ) : showFullSpinner ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Loader2 className="animate-spin mb-4" size={32} />
-              <p>Searching for "{q}"...</p>
+              <p>Searching for &ldquo;{q}&rdquo;...</p>
             </div>
-          ) : searchData?.results.length === 0 ? (
+          ) : q && !isFetching && searchData?.results.length === 0 ? (
             <div className="text-center py-20 text-muted-foreground border border-dashed rounded-lg bg-card/50">
-              <p>No results found for "{q}".</p>
+              <p>No results found for &ldquo;{q}&rdquo;.</p>
             </div>
-          ) : (
+          ) : hasResults ? (
             <SearchResults
               results={searchData?.results || []}
               total={searchData?.total || 0}
@@ -299,7 +340,12 @@ export default function SearchPage() {
               onNavigate={setLocation}
               searchString={searchString}
             />
-          )}
+          ) : isFetching ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+              <Loader2 className="animate-spin" size={18} />
+              <p className="text-sm">Searching&hellip;</p>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
