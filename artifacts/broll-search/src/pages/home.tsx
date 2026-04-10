@@ -19,7 +19,7 @@ export default function Home() {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-5xl mx-auto p-8">
         <div className="flex flex-col items-center text-center space-y-6 py-12">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Find the exact moment.</h1>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Find that footage.</h1>
           <p className="text-lg text-muted-foreground max-w-2xl">
             Search through your video library's visual frames and spoken content using natural language.
           </p>
