@@ -26,7 +26,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground">
             <LayoutGrid size={18} />
           </div>
-          <span className="font-bold tracking-tight text-lg">B-Roll Search</span>
+          <span className="font-bold tracking-tight text-lg">Footage Search</span>
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map((item) => {

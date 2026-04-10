@@ -107,7 +107,7 @@ export default function Settings() {
       <div className="max-w-4xl mx-auto space-y-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Settings & Integrations</h1>
-          <p className="text-muted-foreground mt-1">Connect your data sources to B-Roll Search.</p>
+          <p className="text-muted-foreground mt-1">Connect your data sources to Footage Search.</p>
         </div>
 
         <Card className="border-border">

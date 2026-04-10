@@ -1,4 +1,4 @@
-# B-Roll Search App
+# Footage Search App
 
 ## Overview
 

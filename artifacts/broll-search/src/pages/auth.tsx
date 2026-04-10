@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LayoutGrid, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,15 +49,19 @@ export default function AuthPage() {
     }
   };
 
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
+
   return (
     <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md border-border/50 bg-card/80 backdrop-blur">
         <CardHeader className="text-center space-y-4">
           <div className="flex items-center justify-center gap-3">
             <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center text-primary-foreground">
               <LayoutGrid size={22} />
             </div>
-            <span className="font-bold tracking-tight text-2xl">B-Roll Search</span>
+            <span className="font-bold tracking-tight text-2xl">Footage Search</span>
           </div>
           <div>
             <CardTitle className="text-xl">

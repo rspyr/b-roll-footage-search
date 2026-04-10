@@ -60,7 +60,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Base Light Theme (B-Roll Search is dark-first, but we provide light as well) */
+/* Base Light Theme (Footage Search is dark-first, but we provide light as well) */
 :root {
   --background: 0 0% 98%;
   --foreground: 240 10% 10%;
