@@ -8,8 +8,9 @@ import {
   SyncVideosBody,
 } from "@workspace/api-zod";
 import { listVideoFiles } from "../../lib/google-drive";
-import { processVideo, startProcessingQueue, requestCancellation, getProcessingState, invalidateQueue } from "../../lib/video-processor";
+import { processVideo, startProcessingQueue, requestCancellation, getProcessingState, invalidateQueue, generateVideoTags } from "../../lib/video-processor";
 import { syncRateLimit, processRateLimit } from "../../lib/rate-limit";
+import { logger } from "../../lib/logger";
 
 const router: IRouter = Router();
 
@@ -161,6 +162,63 @@ router.post("/videos/sync", syncRateLimit, async (req, res): Promise<void> => {
     syncedCount: syncedVideos.length,
     videos: syncedVideos,
   });
+});
+
+let backfillInProgress = false;
+
+router.post("/videos/backfill-tags", async (_req, res): Promise<void> => {
+  if (backfillInProgress) {
+    res.status(409).json({ error: "Tag backfill is already in progress" });
+    return;
+  }
+
+  const allCompleted = await db.select({
+    id: videosTable.id,
+    title: videosTable.title,
+    tags: videosTable.tags,
+  }).from(videosTable)
+    .where(eq(videosTable.status, "completed"));
+
+  const videosNeedingTags = allCompleted.filter(v => !v.tags);
+
+  backfillInProgress = true;
+  res.json({ message: `Starting backfill for ${videosNeedingTags.length} videos`, total: videosNeedingTags.length });
+
+  (async () => {
+    let succeeded = 0;
+    let failed = 0;
+
+    try {
+      for (const video of videosNeedingTags) {
+        try {
+          const frames = await db.select({ description: framesTable.description })
+            .from(framesTable)
+            .where(eq(framesTable.videoId, video.id));
+
+          const transcriptions = await db.select({ content: transcriptionsTable.content })
+            .from(transcriptionsTable)
+            .where(eq(transcriptionsTable.videoId, video.id));
+
+          const tags = await generateVideoTags(
+            video.title,
+            frames.map(f => f.description).filter(Boolean) as string[],
+            transcriptions.map(t => t.content).filter(Boolean) as string[],
+          );
+
+          await db.update(videosTable).set({ tags }).where(eq(videosTable.id, video.id));
+          succeeded++;
+          logger.info({ videoId: video.id, tags }, "Backfilled tags");
+        } catch (err) {
+          failed++;
+          logger.error({ videoId: video.id, err }, "Failed to backfill tags");
+        }
+      }
+    } finally {
+      backfillInProgress = false;
+    }
+
+    logger.info({ succeeded, failed, total: videosNeedingTags.length }, "Tag backfill complete");
+  })();
 });
 
 export default router;

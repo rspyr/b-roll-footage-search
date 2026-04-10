@@ -311,6 +311,39 @@ async function transcribeAudio(audioPath: string): Promise<WhisperSegment[]> {
   }
 }
 
+export async function generateVideoTags(title: string, frameDescriptions: string[], transcriptionTexts: string[] = []): Promise<string> {
+  const cleanTitle = title.replace(/\.[a-zA-Z0-9]+$/, "");
+  const uniqueDescs = [...new Set(frameDescriptions.filter(d => d && d !== "Description unavailable"))];
+  const descSample = uniqueDescs.slice(0, 10).join("\n---\n");
+  const transcriptSample = transcriptionTexts.filter(Boolean).slice(0, 10).join(" ");
+
+  const prompt = `You are a B-roll video tagging system. Given a video's title, frame descriptions, and transcription, generate a comprehensive list of concept tags that would help someone find this video through search.
+
+Title: ${cleanTitle}
+${descSample ? `\nFrame descriptions:\n${descSample}` : ""}
+${transcriptSample ? `\nTranscription excerpt:\n${transcriptSample}` : ""}
+
+Generate tags covering:
+- What the video literally shows (objects, actions, people, animals, settings)
+- Abstract concepts and themes (competition, nature, relaxation, technology)
+- Emotions and moods conveyed
+- Use cases someone might search for (e.g. "background for presentation", "intro clip")
+- Related/synonymous terms a searcher might use
+
+Return ONLY a comma-separated list of lowercase tags, no numbering, no explanations. Include 15-30 tags.`;
+
+  const response = await withRetry(async () => {
+    const result = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: { maxOutputTokens: 512 },
+    });
+    return result.text ?? "";
+  }, 2, "generate-video-tags");
+
+  return response.trim();
+}
+
 interface VideoSegmentInfo {
   startSec: number;
   endSec: number;
@@ -625,6 +658,7 @@ export async function processVideo(videoId: number): Promise<void> {
     checkCancellation(videoId);
     updateProcessingStep("Transcribing audio");
     logger.info({ videoId }, "Extracting and transcribing audio");
+    const transcriptionTexts: string[] = [];
     try {
       const audioPath = await extractAudio(videoPath, videoId, signal);
       const segments = await transcribeAudio(audioPath);
@@ -636,6 +670,7 @@ export async function processVideo(videoId: number): Promise<void> {
           endSec: segment.end,
           content: segment.text,
         });
+        transcriptionTexts.push(segment.text);
       }
       logger.info({ videoId, segmentCount: segments.length }, "Transcriptions saved");
 
@@ -692,6 +727,18 @@ export async function processVideo(videoId: number): Promise<void> {
     } catch (err) {
       if (isCancellationError(err)) throw err;
       logger.error({ videoId, err }, "Video segmentation/embedding failed, continuing without embeddings");
+    }
+
+    checkCancellation(videoId);
+    updateProcessingStep("Generating tags");
+    logger.info({ videoId }, "Generating concept tags with Gemini");
+    try {
+      const tags = await generateVideoTags(video.title, frameDescriptions.map(fd => fd.description), transcriptionTexts);
+      await db.update(videosTable).set({ tags }).where(eq(videosTable.id, videoId));
+      logger.info({ videoId, tags }, "Concept tags saved");
+    } catch (err) {
+      if (isCancellationError(err)) throw err;
+      logger.warn({ videoId, err }, "Tag generation failed, continuing without tags");
     }
 
     checkCancellation(videoId);

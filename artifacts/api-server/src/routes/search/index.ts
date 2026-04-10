@@ -7,6 +7,49 @@ import { logger } from "../../lib/logger";
 
 const router: IRouter = Router();
 
+const expandedQueryCache = new Map<string, { expanded: string; ts: number }>();
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+async function expandQuery(query: string): Promise<string> {
+  const cacheKey = query.toLowerCase().trim();
+  const cached = expandedQueryCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return cached.expanded;
+  }
+
+  try {
+    const result = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{
+        role: "user",
+        parts: [{
+          text: `You are a search query expander for a B-roll video library. Given a user search query, expand it with synonyms and related terms to improve recall.
+
+Query: "${query}"
+
+Return the original query plus additional related search terms, all space-separated on a single line. Keep it concise (under 20 words total). Do NOT add explanations.`,
+        }],
+      }],
+      config: { maxOutputTokens: 100 },
+    });
+
+    const expanded = result.text?.trim() || query;
+    expandedQueryCache.set(cacheKey, { expanded, ts: Date.now() });
+
+    if (expandedQueryCache.size > 500) {
+      const oldest = [...expandedQueryCache.entries()]
+        .sort((a, b) => a[1].ts - b[1].ts)
+        .slice(0, 100);
+      for (const [key] of oldest) expandedQueryCache.delete(key);
+    }
+
+    return expanded;
+  } catch (err) {
+    logger.warn({ err, query }, "Query expansion failed, using original query");
+    return query;
+  }
+}
+
 async function embedQuery(query: string): Promise<number[] | null> {
   try {
     const result = await gemini.models.embedContent({
@@ -35,7 +78,10 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
 
   const fetchLimit = (limit + offset) * 5 + 50;
 
-  const queryEmbedding = await embedQuery(q);
+  const [queryEmbedding, expandedQuery] = await Promise.all([
+    embedQuery(q),
+    expandQuery(q),
+  ]);
 
   const ftsUnionParts: string[] = [];
 
@@ -139,7 +185,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
         LIMIT $2
       `;
 
-      const ftsResult = await client.query(ftsQuery, [q, fetchLimit]);
+      const ftsResult = await client.query(ftsQuery, [expandedQuery, fetchLimit]);
 
       for (let i = 0; i < ftsResult.rows.length; i++) {
         const row = ftsResult.rows[i];
@@ -177,7 +223,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
         LIMIT $2
       `;
 
-      const titleFtsResult = await client.query(titleFtsQuery, [q, fetchLimit]);
+      const titleFtsResult = await client.query(titleFtsQuery, [expandedQuery, fetchLimit]);
       const TITLE_FTS_BOOST = 3;
 
       for (let i = 0; i < titleFtsResult.rows.length; i++) {
@@ -229,6 +275,79 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
           imagePath: row.imagePath ? String(row.imagePath) : null,
           rank: rrfScore,
           source: "title_fuzzy",
+        });
+      }
+    }
+
+    if (type === "all") {
+      const tagFtsQuery = `
+        SELECT
+          v.id as "videoId",
+          v.title as "videoTitle",
+          v.drive_file_id as "driveFileId",
+          v.duration::double precision as "endSec",
+          v.tags as content,
+          (SELECT f.image_path FROM frames f WHERE f.video_id = v.id ORDER BY f.timestamp_sec LIMIT 1) as "imagePath",
+          ts_rank(to_tsvector('english', v.tags), plainto_tsquery('english', $1)) as rank
+        FROM videos v
+        WHERE v.tags IS NOT NULL
+          AND to_tsvector('english', v.tags) @@ plainto_tsquery('english', $1)
+        ORDER BY rank DESC
+        LIMIT $2
+      `;
+
+      const tagFtsResult = await client.query(tagFtsQuery, [expandedQuery, fetchLimit]);
+      const TAG_FTS_BOOST = 2;
+
+      for (let i = 0; i < tagFtsResult.rows.length; i++) {
+        const row = tagFtsResult.rows[i];
+        const rrfScore = (1 / (60 + i + 1)) * TAG_FTS_BOOST;
+        allResults.push({
+          type: "frame",
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
+          timestampSec: 0,
+          endSec: row.endSec != null ? Number(row.endSec) : null,
+          content: `Tag match: ${String(row.content)}`,
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "tags",
+        });
+      }
+
+      const tagFuzzyQuery = `
+        SELECT
+          v.id as "videoId",
+          v.title as "videoTitle",
+          v.drive_file_id as "driveFileId",
+          v.duration::double precision as "endSec",
+          v.tags as content,
+          (SELECT f.image_path FROM frames f WHERE f.video_id = v.id ORDER BY f.timestamp_sec LIMIT 1) as "imagePath",
+          word_similarity($1, lower(v.tags)) as sim
+        FROM videos v
+        WHERE v.tags IS NOT NULL
+          AND word_similarity($1, lower(v.tags)) > 0.3
+        ORDER BY sim DESC
+        LIMIT $2
+      `;
+
+      const tagFuzzyResult = await client.query(tagFuzzyQuery, [q.toLowerCase(), fetchLimit]);
+
+      for (let i = 0; i < tagFuzzyResult.rows.length; i++) {
+        const row = tagFuzzyResult.rows[i];
+        const rrfScore = 1 / (60 + i + 1);
+        allResults.push({
+          type: "frame",
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
+          timestampSec: 0,
+          endSec: row.endSec != null ? Number(row.endSec) : null,
+          content: `Tag match: ${String(row.content)}`,
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "tags_fuzzy",
         });
       }
     }
@@ -320,6 +439,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       })),
       total,
       query: q,
+      expandedQuery: expandedQuery !== q ? expandedQuery : undefined,
     });
   } finally {
     client.release();

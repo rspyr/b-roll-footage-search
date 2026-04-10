@@ -27,7 +27,7 @@ A semantic video search application that connects to Google Drive, processes vid
 ### Database Tables
 - **users** — User accounts with email (unique), name, bcrypt password hash, timestamps. Only `@hvaclaunch.ai` emails can register.
 - **session** — Server-side session storage (connect-pg-simple). Auto-created on startup.
-- **videos** — Video metadata, Drive file ID, sync/processing status, duration
+- **videos** — Video metadata, Drive file ID, sync/processing status, duration, AI-generated concept tags
 - **frames** — Extracted frames with timestamps, image paths, Gemini-generated descriptions. GIN index on description tsvector for full-text search.
 - **transcriptions** — Audio transcription segments with start/end timestamps. GIN index on content tsvector for full-text search.
 - **video_segments** — Video segment embeddings for semantic vector search. Each row stores a segment's start/end timestamps and a 768-dimensional vector embedding from `gemini-embedding-2-preview`. HNSW index on embedding column for fast cosine similarity search.
@@ -63,6 +63,7 @@ A semantic video search application that connects to Google Drive, processes vid
 - `POST /api/videos/:id/frames` — Add a manual frame description to a video
 - `PATCH /api/transcriptions/:id` — Update a transcription segment's content
 - `POST /api/videos/:id/transcriptions` — Add a manual transcription segment to a video
+- `POST /api/videos/backfill-tags` — Generate AI concept tags for all completed videos missing tags (runs async in background)
 
 ### Processing Pipeline
 1. Download video from Google Drive
@@ -71,13 +72,18 @@ A semantic video search application that connects to Google Drive, processes vid
 4. Extract audio and transcribe with OpenAI Whisper
 5. Segment video for embedding (≤120s: whole file; >120s: ~90s segments with 10s overlap)
 6. Embed each video segment directly using `gemini-embedding-2-preview` (768-dim vectors)
-7. Store all results in PostgreSQL with FTS indexes and pgvector HNSW index
+7. Generate AI concept tags using Gemini 2.5 Flash (from title + frame descriptions + transcriptions)
+8. Store all results in PostgreSQL with FTS indexes, trigram indexes, and pgvector HNSW index
 
 ### Search Architecture (Hybrid)
-- **Vector search**: User query is embedded via `gemini-embedding-2-preview`, then matched against video segment embeddings using pgvector cosine similarity (`<=>` operator)
-- **Full-text search**: PostgreSQL `plainto_tsquery` against frame descriptions and transcriptions
-- **Fusion**: Results from both sources are combined using Reciprocal Rank Fusion (RRF), deduplicated by video+timestamp, and ranked
-- This means "dog sweating" can find clips of dogs panting because the video embedding captures semantic meaning beyond exact keywords
+- **Query expansion**: User query is expanded by Gemini 2.5 Flash with synonyms/related terms before FTS (cached 10min)
+- **Vector search**: Original user query is embedded via `gemini-embedding-2-preview`, then matched against video segment embeddings using pgvector cosine similarity (`<=>` operator)
+- **Full-text search**: PostgreSQL `plainto_tsquery` with expanded query against frame descriptions, transcriptions, titles, and tags
+- **Fuzzy matching**: `pg_trgm` word_similarity matching on titles, frame descriptions, and tags
+- **Tag search**: AI-generated concept tags searched via FTS (2x boost) and fuzzy matching (1x)
+- **Fusion**: Results from all sources combined using Reciprocal Rank Fusion (RRF), deduplicated by video, and ranked
+- **RRF boosts**: Title FTS (3x), Title fuzzy (2x), Tag FTS (2x), Vector (1x), Frame FTS (1x), Transcription FTS (1x), Tag fuzzy (1x), Desc fuzzy (1x)
+- This means "game" can find "Rock Paper Scissors.mp4" because concept tags capture abstract relationships
 
 ### Frame Storage (Object Storage)
 - Extracted frame images are stored in **Replit Object Storage** (GCS-backed) for persistence across deployments
