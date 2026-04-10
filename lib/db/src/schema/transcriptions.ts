@@ -1,5 +1,4 @@
 import { pgTable, text, serial, timestamp, integer, real, index } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { videosTable } from "./videos";
@@ -13,7 +12,6 @@ export const transcriptionsTable = pgTable("transcriptions", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("transcriptions_video_id_idx").on(table.videoId),
-  index("transcriptions_content_tsv_idx").using("gin", sql`to_tsvector('english', ${table.content})`),
 ]);
 
 export const insertTranscriptionSchema = createInsertSchema(transcriptionsTable).omit({ id: true, createdAt: true });

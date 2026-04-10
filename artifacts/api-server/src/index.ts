@@ -61,6 +61,17 @@ async function ensureSessionTable() {
   `);
 }
 
+async function ensureSearchIndexes() {
+  const { pool } = await import("@workspace/db");
+  await pool.query(`CREATE INDEX IF NOT EXISTS videos_title_tsv_idx ON videos USING gin (to_tsvector('english', regexp_replace(title, '\\.[a-zA-Z0-9]+$', '')));`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS videos_title_trgm_idx ON videos USING gin (lower(regexp_replace(title, '\\.[a-zA-Z0-9]+$', '')) gin_trgm_ops);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS videos_tags_tsv_idx ON videos USING gin (to_tsvector('english', tags));`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS videos_tags_trgm_idx ON videos USING gin (lower(tags) gin_trgm_ops);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS frames_description_tsv_idx ON frames USING gin (to_tsvector('english', description));`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS frames_description_trgm_idx ON frames USING gin (lower(description) gin_trgm_ops);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS transcriptions_content_tsv_idx ON transcriptions USING gin (to_tsvector('english', content));`);
+}
+
 async function ensureVideoSegmentsTable() {
   const { pool } = await import("@workspace/db");
   await pool.query(`CREATE EXTENSION IF NOT EXISTS vector;`);
@@ -263,6 +274,7 @@ async function propagateTagsViaEmbeddings(poolClient: any) {
 async function start() {
   await ensureSessionTable();
   await ensureVideoSegmentsTable();
+  await ensureSearchIndexes();
   await ensureFeedbackTables();
   await resetZombieProcessingVideos();
 

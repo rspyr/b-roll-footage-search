@@ -1,5 +1,4 @@
 import { pgTable, text, serial, timestamp, integer, real, index } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { videosTable } from "./videos";
@@ -13,8 +12,6 @@ export const framesTable = pgTable("frames", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("frames_video_id_idx").on(table.videoId),
-  index("frames_description_tsv_idx").using("gin", sql`to_tsvector('english', ${table.description})`),
-  index("frames_description_trgm_idx").using("gin", sql`lower(${table.description}) gin_trgm_ops`),
 ]);
 
 export const insertFrameSchema = createInsertSchema(framesTable).omit({ id: true, createdAt: true });

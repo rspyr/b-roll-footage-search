@@ -1,5 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, index } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -18,12 +17,7 @@ export const videosTable = pgTable("videos", {
   tags: text("tags"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-}, (table) => [
-  index("videos_title_tsv_idx").using("gin", sql`to_tsvector('english', regexp_replace(${table.title}, '\\.[a-zA-Z0-9]+$', ''))`),
-  index("videos_title_trgm_idx").using("gin", sql`lower(regexp_replace(${table.title}, '\\.[a-zA-Z0-9]+$', '')) gin_trgm_ops`),
-  index("videos_tags_tsv_idx").using("gin", sql`to_tsvector('english', ${table.tags})`),
-  index("videos_tags_trgm_idx").using("gin", sql`lower(${table.tags}) gin_trgm_ops`),
-]);
+});
 
 export const insertVideoSchema = createInsertSchema(videosTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertVideo = z.infer<typeof insertVideoSchema>;
