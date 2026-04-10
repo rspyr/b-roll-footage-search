@@ -615,6 +615,8 @@ components:
           type: integer
         videoTitle:
           type: string
+        driveFileId:
+          type: ["string", "null"]
         timestampSec:
           type: number
         endSec:
@@ -623,6 +625,10 @@ components:
           type: string
         imagePath:
           type: ["string", "null"]
+        allFramePaths:
+          type: array
+          items:
+            type: string
         rank:
           type: number
       required:

@@ -45,6 +45,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
         'frame' as type,
         f.video_id as "videoId",
         v.title as "videoTitle",
+        v.drive_file_id as "driveFileId",
         f.timestamp_sec as "timestampSec",
         NULL::double precision as "endSec",
         f.description as content,
@@ -63,6 +64,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
         'transcription' as type,
         t.video_id as "videoId",
         v.title as "videoTitle",
+        v.drive_file_id as "driveFileId",
         t.start_sec as "timestampSec",
         t.end_sec as "endSec",
         t.content as content,
@@ -80,6 +82,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       type: string;
       videoId: number;
       videoTitle: string;
+      driveFileId: string | null;
       timestampSec: number;
       endSec: number | null;
       content: string;
@@ -94,6 +97,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
           'segment' as type,
           vs.video_id as "videoId",
           v.title as "videoTitle",
+          v.drive_file_id as "driveFileId",
           vs.start_sec as "timestampSec",
           vs.end_sec as "endSec",
           '' as content,
@@ -116,6 +120,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
           type: String(row.type),
           videoId: Number(row.videoId),
           videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
           timestampSec: Number(row.timestampSec),
           endSec: row.endSec != null ? Number(row.endSec) : null,
           content: row.content ? String(row.content) : `Semantic match (similarity: ${Number(row.similarity).toFixed(3)})`,
@@ -143,6 +148,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
           type: String(row.type),
           videoId: Number(row.videoId),
           videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
           timestampSec: Number(row.timestampSec),
           endSec: row.endSec != null ? Number(row.endSec) : null,
           content: String(row.content),
@@ -174,15 +180,32 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
     const total = allMerged.length;
     const paged = allMerged.slice(offset, offset + limit);
 
+    const videoIds = [...new Set(paged.map(r => r.videoId))];
+    const framePathsMap = new Map<number, string[]>();
+    if (videoIds.length > 0) {
+      const placeholders = videoIds.map((_, i) => `$${i + 1}`).join(",");
+      const framesResult = await client.query(
+        `SELECT video_id, image_path FROM frames WHERE video_id IN (${placeholders}) AND image_path IS NOT NULL AND image_path NOT LIKE 'manual/%' ORDER BY video_id, timestamp_sec`,
+        videoIds
+      );
+      for (const row of framesResult.rows) {
+        const vid = Number(row.video_id);
+        if (!framePathsMap.has(vid)) framePathsMap.set(vid, []);
+        framePathsMap.get(vid)!.push(String(row.image_path));
+      }
+    }
+
     res.json({
       results: paged.map(r => ({
         type: r.type,
         videoId: r.videoId,
         videoTitle: r.videoTitle,
+        driveFileId: r.driveFileId,
         timestampSec: r.timestampSec,
         endSec: r.endSec,
         content: r.content,
         imagePath: r.imagePath,
+        allFramePaths: framePathsMap.get(r.videoId) || [],
         rank: r.rank,
       })),
       total,

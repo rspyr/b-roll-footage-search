@@ -11,11 +11,14 @@ export interface SearchResult {
   type: SearchResultType;
   videoId: number;
   videoTitle: string;
+  /** @nullable */
+  driveFileId?: string | null;
   timestampSec: number;
   /** @nullable */
   endSec?: number | null;
   content: string;
   /** @nullable */
   imagePath?: string | null;
+  allFramePaths?: string[];
   rank: number;
 }

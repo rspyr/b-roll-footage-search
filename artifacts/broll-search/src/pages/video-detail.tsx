@@ -78,8 +78,12 @@ export default function VideoDetail() {
   const id = params?.id ? parseInt(params.id) : 0;
 
   const searchString = useSearch();
-  const timestamp = new URLSearchParams(searchString).get("t");
+  const urlParams = new URLSearchParams(searchString);
+  const timestamp = urlParams.get("t");
   const targetTs = timestamp ? parseFloat(timestamp) : null;
+  const fromParam = urlParams.get("from");
+  const backHref = fromParam || "/library";
+  const backLabel = fromParam?.startsWith("/search") ? "Back to results" : "Back";
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -278,10 +282,10 @@ export default function VideoDetail() {
         <div className="max-w-7xl mx-auto">
           <Button asChild variant="ghost" size="sm" className="mb-4">
             <Link
-              href="/library"
+              href={backHref}
               className="flex items-center text-muted-foreground hover:text-foreground"
             >
-              <ArrowLeft size={16} className="mr-2" /> Back
+              <ArrowLeft size={16} className="mr-2" /> {backLabel}
             </Link>
           </Button>
 

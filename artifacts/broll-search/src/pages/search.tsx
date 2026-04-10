@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useSearchContent, getSearchContentQueryKey } from "@workspace/api-client-react";
-import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles } from "lucide-react";
+import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +15,8 @@ interface SearchResultItem {
   timestampSec: number;
   endSec?: number | null;
   imagePath?: string | null;
+  driveFileId?: string | null;
+  allFramePaths?: string[];
   rank: number;
 }
 
@@ -34,16 +36,111 @@ function RelevanceBar({ rank, maxRank }: { rank: number; maxRank: number }) {
   );
 }
 
+function HoverScrubThumbnail({
+  imagePath,
+  allFramePaths,
+  type,
+}: {
+  imagePath?: string | null;
+  allFramePaths?: string[];
+  type: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+
+  const frames = allFramePaths && allFramePaths.length > 0 ? allFramePaths : [];
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (frames.length < 2) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, x / rect.width));
+      const idx = Math.min(Math.floor(pct * frames.length), frames.length - 1);
+      setScrubIndex(idx);
+    },
+    [frames.length]
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    setScrubIndex(null);
+  }, []);
+
+  const displayPath =
+    scrubIndex !== null && frames.length > 0
+      ? frames[scrubIndex]
+      : imagePath;
+
+  const hasImage = displayPath && !displayPath.startsWith("manual/");
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full relative"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      {hasImage ? (
+        <img
+          src={`/api/frames/${displayPath}`}
+          alt="Video frame"
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-muted-foreground">
+          <Mic size={32} opacity={0.3} />
+        </div>
+      )}
+      {scrubIndex !== null && frames.length > 1 && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
+          <div
+            className="h-full bg-white/80 transition-[width] duration-75"
+            style={{ width: `${((scrubIndex + 1) / frames.length) * 100}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CopyDriveLinkButton({ driveFileId }: { driveFileId: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const url = `https://drive.google.com/file/d/${driveFileId}/view`;
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    },
+    [driveFileId]
+  );
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="p-1.5 rounded-md bg-black/60 hover:bg-black/80 text-white transition-colors"
+      title={copied ? "Copied!" : "Copy Drive link"}
+    >
+      {copied ? <Check size={14} /> : <LinkIcon size={14} />}
+    </button>
+  );
+}
+
 function SearchResults({
   results,
   total,
   query,
   onNavigate,
+  searchString,
 }: {
   results: SearchResultItem[];
   total: number;
   query: string;
   onNavigate: (path: string) => void;
+  searchString: string;
 }) {
   const maxRank = useMemo(() => {
     if (results.length === 0) return 0;
@@ -61,20 +158,17 @@ function SearchResults({
           <div 
             key={i} 
             className="flex flex-col rounded-lg border border-border bg-card overflow-hidden cursor-pointer hover:border-primary/50 transition-colors shadow-sm"
-            onClick={() => onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}`)}
+            onClick={() => {
+              const searchUrl = "/search" + (searchString.startsWith("?") ? searchString : `?${searchString}`);
+              onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}&from=${encodeURIComponent(searchUrl)}`);
+            }}
           >
             <div className="aspect-video bg-muted relative">
-              {result.imagePath && !result.imagePath.startsWith("manual/") ? (
-                <img 
-                  src={`/api/frames/${result.imagePath}`} 
-                  alt="Video frame" 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-muted-foreground">
-                  <Mic size={32} opacity={0.3} />
-                </div>
-              )}
+              <HoverScrubThumbnail
+                imagePath={result.imagePath}
+                allFramePaths={result.allFramePaths}
+                type={result.type}
+              />
               
               <div className="absolute bottom-2 left-2 flex gap-2">
                 <span className="bg-black/80 px-2 py-1 rounded text-xs font-mono text-white flex items-center gap-1">
@@ -83,7 +177,10 @@ function SearchResults({
                 </span>
               </div>
               
-              <div className="absolute top-2 right-2">
+              <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                {result.driveFileId && (
+                  <CopyDriveLinkButton driveFileId={result.driveFileId} />
+                )}
                 <span className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 shadow-sm
                   ${result.type === 'frame' ? 'bg-blue-500/90 text-white' : 'bg-purple-500/90 text-white'}`}>
                   {result.type === 'frame' ? <ImageIcon size={12}/> : <Mic size={12}/>}
@@ -123,7 +220,6 @@ export default function SearchPage() {
   const [query, setQuery] = useState(q);
   const [type, setType] = useState<"all" | "visual" | "audio">(typeParam);
   
-  // Update local state if URL changes
   useEffect(() => {
     setQuery(q);
     setType(typeParam);
@@ -201,6 +297,7 @@ export default function SearchPage() {
               total={searchData?.total || 0}
               query={q}
               onNavigate={setLocation}
+              searchString={searchString}
             />
           )}
         </div>
