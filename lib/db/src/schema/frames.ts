@@ -14,6 +14,7 @@ export const framesTable = pgTable("frames", {
 }, (table) => [
   index("frames_video_id_idx").on(table.videoId),
   index("frames_description_tsv_idx").using("gin", sql`to_tsvector('english', ${table.description})`),
+  index("frames_description_trgm_idx").using("gin", sql`lower(${table.description}) gin_trgm_ops`),
 ]);
 
 export const insertFrameSchema = createInsertSchema(framesTable).omit({ id: true, createdAt: true });

@@ -160,7 +160,9 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
     }
 
     if (type === "all") {
-      const titleQuery = `
+      const cleanTitle = `regexp_replace(v.title, '\\.[a-zA-Z0-9]+$', '')`;
+
+      const titleFtsQuery = `
         SELECT
           v.id as "videoId",
           v.title as "videoTitle",
@@ -168,19 +170,19 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
           v.duration::double precision as "endSec",
           v.title as content,
           (SELECT f.image_path FROM frames f WHERE f.video_id = v.id ORDER BY f.timestamp_sec LIMIT 1) as "imagePath",
-          ts_rank(to_tsvector('english', v.title), plainto_tsquery('english', $1)) as rank
+          ts_rank(to_tsvector('english', ${cleanTitle}), plainto_tsquery('english', $1)) as rank
         FROM videos v
-        WHERE to_tsvector('english', v.title) @@ plainto_tsquery('english', $1)
+        WHERE to_tsvector('english', ${cleanTitle}) @@ plainto_tsquery('english', $1)
         ORDER BY rank DESC
         LIMIT $2
       `;
 
-      const titleResult = await client.query(titleQuery, [q, fetchLimit]);
-      const TITLE_BOOST = 3;
+      const titleFtsResult = await client.query(titleFtsQuery, [q, fetchLimit]);
+      const TITLE_FTS_BOOST = 3;
 
-      for (let i = 0; i < titleResult.rows.length; i++) {
-        const row = titleResult.rows[i];
-        const rrfScore = (1 / (60 + i + 1)) * TITLE_BOOST;
+      for (let i = 0; i < titleFtsResult.rows.length; i++) {
+        const row = titleFtsResult.rows[i];
+        const rrfScore = (1 / (60 + i + 1)) * TITLE_FTS_BOOST;
         allResults.push({
           type: "frame",
           videoId: Number(row.videoId),
@@ -192,6 +194,80 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
           imagePath: row.imagePath ? String(row.imagePath) : null,
           rank: rrfScore,
           source: "title",
+        });
+      }
+
+      const titleFuzzyQuery = `
+        SELECT
+          v.id as "videoId",
+          v.title as "videoTitle",
+          v.drive_file_id as "driveFileId",
+          v.duration::double precision as "endSec",
+          v.title as content,
+          (SELECT f.image_path FROM frames f WHERE f.video_id = v.id ORDER BY f.timestamp_sec LIMIT 1) as "imagePath",
+          word_similarity($1, lower(${cleanTitle})) as sim
+        FROM videos v
+        WHERE word_similarity($1, lower(${cleanTitle})) > 0.3
+        ORDER BY sim DESC
+        LIMIT $2
+      `;
+
+      const titleFuzzyResult = await client.query(titleFuzzyQuery, [q.toLowerCase(), fetchLimit]);
+      const TITLE_FUZZY_BOOST = 2;
+
+      for (let i = 0; i < titleFuzzyResult.rows.length; i++) {
+        const row = titleFuzzyResult.rows[i];
+        const rrfScore = (1 / (60 + i + 1)) * TITLE_FUZZY_BOOST;
+        allResults.push({
+          type: "frame",
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
+          timestampSec: 0,
+          endSec: row.endSec != null ? Number(row.endSec) : null,
+          content: `Title match: ${String(row.content)}`,
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "title_fuzzy",
+        });
+      }
+    }
+
+    if (type === "all" || type === "visual") {
+      const descFuzzyQuery = `
+        SELECT
+          f.video_id as "videoId",
+          v.title as "videoTitle",
+          v.drive_file_id as "driveFileId",
+          f.timestamp_sec as "timestampSec",
+          NULL::double precision as "endSec",
+          f.description as content,
+          f.image_path as "imagePath",
+          word_similarity($1, lower(f.description)) as sim
+        FROM frames f
+        JOIN videos v ON v.id = f.video_id
+        WHERE f.description IS NOT NULL
+          AND word_similarity($1, lower(f.description)) > 0.3
+        ORDER BY sim DESC
+        LIMIT $2
+      `;
+
+      const descFuzzyResult = await client.query(descFuzzyQuery, [q.toLowerCase(), fetchLimit]);
+
+      for (let i = 0; i < descFuzzyResult.rows.length; i++) {
+        const row = descFuzzyResult.rows[i];
+        const rrfScore = 1 / (60 + i + 1);
+        allResults.push({
+          type: "frame",
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
+          timestampSec: Number(row.timestampSec),
+          endSec: null,
+          content: String(row.content),
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "desc_fuzzy",
         });
       }
     }

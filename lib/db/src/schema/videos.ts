@@ -18,7 +18,8 @@ export const videosTable = pgTable("videos", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (table) => [
-  index("videos_title_tsv_idx").using("gin", sql`to_tsvector('english', ${table.title})`),
+  index("videos_title_tsv_idx").using("gin", sql`to_tsvector('english', regexp_replace(${table.title}, '\\.[a-zA-Z0-9]+$', ''))`),
+  index("videos_title_trgm_idx").using("gin", sql`lower(regexp_replace(${table.title}, '\\.[a-zA-Z0-9]+$', '')) gin_trgm_ops`),
 ]);
 
 export const insertVideoSchema = createInsertSchema(videosTable).omit({ id: true, createdAt: true, updatedAt: true });

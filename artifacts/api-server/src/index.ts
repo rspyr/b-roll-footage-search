@@ -64,6 +64,7 @@ async function ensureSessionTable() {
 async function ensureVideoSegmentsTable() {
   const { pool } = await import("@workspace/db");
   await pool.query(`CREATE EXTENSION IF NOT EXISTS vector;`);
+  await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS video_segments (
       id SERIAL PRIMARY KEY,
