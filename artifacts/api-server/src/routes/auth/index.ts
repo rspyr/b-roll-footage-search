@@ -2,6 +2,8 @@ import { Router, type IRouter } from "express";
 import bcrypt from "bcrypt";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
+import { syncAllFolders } from "../../lib/auto-sync";
+import { logger } from "../../lib/logger";
 
 const router: IRouter = Router();
 
@@ -76,6 +78,10 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   await regenerateSession(req);
   req.session.userId = user.id;
   res.json({ id: user.id, email: user.email, name: user.name });
+
+  syncAllFolders().catch((err) => {
+    logger.error({ err }, "Auto-sync after login failed");
+  });
 });
 
 router.post("/auth/logout", (req, res): void => {
@@ -102,6 +108,10 @@ router.get("/auth/me", async (req, res): Promise<void> => {
   }
 
   res.json({ id: user.id, email: user.email, name: user.name });
+
+  syncAllFolders().catch((err) => {
+    logger.error({ err }, "Auto-sync after session restore failed");
+  });
 });
 
 export default router;
