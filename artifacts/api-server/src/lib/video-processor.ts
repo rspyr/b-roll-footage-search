@@ -20,6 +20,7 @@ const SEGMENTS_DIR = path.join(DATA_DIR, "segments");
 const MAX_SEGMENT_DURATION = 90;
 const SEGMENT_OVERLAP = 10;
 const MAX_EMBED_DURATION = 120;
+const MAX_SEGMENT_FILE_SIZE_MB = 50;
 
 function ensureDirs() {
   for (const dir of [DATA_DIR, VIDEOS_DIR, FRAMES_DIR, SEGMENTS_DIR]) {
@@ -214,20 +215,32 @@ interface VideoSegmentInfo {
 }
 
 async function segmentVideo(videoPath: string, videoId: number, duration: number): Promise<VideoSegmentInfo[]> {
+  logger.info({ videoId, duration }, "Starting video segmentation");
   const segDir = path.join(SEGMENTS_DIR, String(videoId));
   if (!fs.existsSync(segDir)) {
     fs.mkdirSync(segDir, { recursive: true });
   }
 
-  if (duration <= MAX_EMBED_DURATION) {
+  const videoStats = fs.statSync(videoPath);
+  const videoSizeMB = videoStats.size / (1024 * 1024);
+
+  if (duration <= MAX_EMBED_DURATION && videoSizeMB <= MAX_SEGMENT_FILE_SIZE_MB) {
     return [{ startSec: 0, endSec: duration, filePath: videoPath }];
   }
+
+  const bitratePerSec = videoSizeMB / Math.max(duration, 1);
+  const targetSegDuration = bitratePerSec > 0
+    ? Math.min(MAX_SEGMENT_DURATION, Math.floor(MAX_SEGMENT_FILE_SIZE_MB / bitratePerSec))
+    : MAX_SEGMENT_DURATION;
+  const effectiveSegDuration = Math.max(targetSegDuration, 15);
+
+  logger.info({ videoId, videoSizeMB: Math.round(videoSizeMB), bitratePerSec: bitratePerSec.toFixed(2), effectiveSegDuration }, "Calculated segment duration for video");
 
   const segments: VideoSegmentInfo[] = [];
   let startSec = 0;
 
   while (startSec < duration) {
-    const endSec = Math.min(startSec + MAX_SEGMENT_DURATION, duration);
+    const endSec = Math.min(startSec + effectiveSegDuration, duration);
     const segmentPath = path.join(segDir, `segment_${String(segments.length).padStart(4, "0")}.mp4`);
 
     await execFileAsync("ffmpeg", [
@@ -290,6 +303,17 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries: number = 3, label:
 }
 
 async function embedVideoSegment(segmentInfo: VideoSegmentInfo): Promise<number[]> {
+  const stats = fs.statSync(segmentInfo.filePath);
+  const fileSizeMB = stats.size / (1024 * 1024);
+
+  if (fileSizeMB > MAX_SEGMENT_FILE_SIZE_MB) {
+    logger.warn(
+      { filePath: segmentInfo.filePath, fileSizeMB: Math.round(fileSizeMB), maxMB: MAX_SEGMENT_FILE_SIZE_MB },
+      "Segment file too large for embedding, skipping"
+    );
+    throw new Error(`Segment file too large (${Math.round(fileSizeMB)}MB > ${MAX_SEGMENT_FILE_SIZE_MB}MB limit)`);
+  }
+
   const videoBytes = fs.readFileSync(segmentInfo.filePath);
   const base64Video = videoBytes.toString("base64");
   const mimeType = detectMimeType(segmentInfo.filePath);
@@ -335,8 +359,9 @@ export async function processVideo(videoId: number): Promise<void> {
   await db.delete(videoSegmentsTable).where(eq(videoSegmentsTable.videoId, videoId));
   await deleteVideoFrames(videoId);
 
+  let videoPath = video.localPath;
+
   try {
-    let videoPath = video.localPath;
 
     if (!videoPath || !fs.existsSync(videoPath)) {
       videoPath = path.join(VIDEOS_DIR, `${videoId}_${video.title.replace(/[^a-zA-Z0-9._-]/g, "_")}`);
@@ -349,10 +374,18 @@ export async function processVideo(videoId: number): Promise<void> {
     await db.update(videosTable).set({ duration }).where(eq(videosTable.id, videoId));
     logger.info({ videoId, duration }, "Got video duration");
 
-    const frameInterval = duration <= 30 ? 2 : 5;
-    logger.info({ videoId, frameInterval }, "Extracting frames");
-    const framePaths = await extractFrames(videoPath, videoId, frameInterval);
+    const frameInterval = duration <= 30 ? 2 : (duration > 120 ? 10 : 5);
+    logger.info({ videoId, frameInterval, duration }, "Extracting frames");
+    let framePaths = await extractFrames(videoPath, videoId, frameInterval);
     logger.info({ videoId, frameCount: framePaths.length }, "Frames extracted");
+
+    const MAX_FRAMES = 30;
+    if (framePaths.length > MAX_FRAMES) {
+      const step = Math.ceil(framePaths.length / MAX_FRAMES);
+      const sampledPaths = framePaths.filter((_, idx) => idx % step === 0);
+      logger.info({ videoId, originalCount: framePaths.length, sampledCount: sampledPaths.length }, "Sampled frames to stay within limit");
+      framePaths = sampledPaths;
+    }
 
     logger.info({ videoId }, "Describing frames with Gemini Vision");
     const frameDescriptions: Array<{ framePath: string; description: string; frameIndex: number }> = [];
@@ -481,6 +514,15 @@ export async function processVideo(videoId: number): Promise<void> {
       thumbnailPath,
     }).where(eq(videosTable.id, videoId));
 
+    if (videoPath && fs.existsSync(videoPath)) {
+      try {
+        fs.unlinkSync(videoPath);
+        logger.info({ videoId, videoPath }, "Cleaned up downloaded video file");
+      } catch (cleanupErr) {
+        logger.warn({ videoId, err: cleanupErr }, "Failed to clean up video file");
+      }
+    }
+
     logger.info({ videoId }, "Video processing completed");
   } catch (err) {
     logger.error({ videoId, err }, "Video processing failed");
@@ -488,6 +530,22 @@ export async function processVideo(videoId: number): Promise<void> {
       status: "failed",
       processingError: err instanceof Error ? err.message : String(err),
     }).where(eq(videosTable.id, videoId));
+
+    if (videoPath && fs.existsSync(videoPath)) {
+      try {
+        fs.unlinkSync(videoPath);
+        logger.info({ videoId }, "Cleaned up video file after failure");
+      } catch (_) {}
+    }
+    const localFramesDir = path.join(FRAMES_DIR, String(videoId));
+    if (fs.existsSync(localFramesDir)) {
+      try { fs.rmSync(localFramesDir, { recursive: true, force: true }); } catch (_) {}
+    }
+    const segDir = path.join(SEGMENTS_DIR, String(videoId));
+    if (fs.existsSync(segDir)) {
+      try { fs.rmSync(segDir, { recursive: true, force: true }); } catch (_) {}
+    }
+
     throw err;
   }
 }
