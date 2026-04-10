@@ -159,41 +159,41 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       }
     }
 
-    const titleQuery = `
-      SELECT
-        'title' as type,
-        v.id as "videoId",
-        v.title as "videoTitle",
-        v.drive_file_id as "driveFileId",
-        0 as "timestampSec",
-        v.duration::double precision as "endSec",
-        v.title as content,
-        (SELECT f.image_path FROM frames f WHERE f.video_id = v.id ORDER BY f.timestamp_sec LIMIT 1) as "imagePath",
-        ts_rank(to_tsvector('english', v.title), plainto_tsquery('english', $1)) as rank
-      FROM videos v
-      WHERE to_tsvector('english', v.title) @@ plainto_tsquery('english', $1)
-      ORDER BY rank DESC
-      LIMIT $2
-    `;
+    if (type === "all") {
+      const titleQuery = `
+        SELECT
+          v.id as "videoId",
+          v.title as "videoTitle",
+          v.drive_file_id as "driveFileId",
+          v.duration::double precision as "endSec",
+          v.title as content,
+          (SELECT f.image_path FROM frames f WHERE f.video_id = v.id ORDER BY f.timestamp_sec LIMIT 1) as "imagePath",
+          ts_rank(to_tsvector('english', v.title), plainto_tsquery('english', $1)) as rank
+        FROM videos v
+        WHERE to_tsvector('english', v.title) @@ plainto_tsquery('english', $1)
+        ORDER BY rank DESC
+        LIMIT $2
+      `;
 
-    const titleResult = await client.query(titleQuery, [q, fetchLimit]);
-    const TITLE_BOOST = 3;
+      const titleResult = await client.query(titleQuery, [q, fetchLimit]);
+      const TITLE_BOOST = 3;
 
-    for (let i = 0; i < titleResult.rows.length; i++) {
-      const row = titleResult.rows[i];
-      const rrfScore = (1 / (60 + i + 1)) * TITLE_BOOST;
-      allResults.push({
-        type: String(row.type),
-        videoId: Number(row.videoId),
-        videoTitle: String(row.videoTitle),
-        driveFileId: row.driveFileId ? String(row.driveFileId) : null,
-        timestampSec: Number(row.timestampSec),
-        endSec: row.endSec != null ? Number(row.endSec) : null,
-        content: `Title match: ${String(row.content)}`,
-        imagePath: row.imagePath ? String(row.imagePath) : null,
-        rank: rrfScore,
-        source: "title",
-      });
+      for (let i = 0; i < titleResult.rows.length; i++) {
+        const row = titleResult.rows[i];
+        const rrfScore = (1 / (60 + i + 1)) * TITLE_BOOST;
+        allResults.push({
+          type: "frame",
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
+          timestampSec: 0,
+          endSec: row.endSec != null ? Number(row.endSec) : null,
+          content: `Title match: ${String(row.content)}`,
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "title",
+        });
+      }
     }
 
     allResults.sort((a, b) => b.rank - a.rank);
