@@ -389,7 +389,7 @@ export default function VideoDetail() {
                   value={newFrameDesc}
                   onChange={(e) => setNewFrameDesc(e.target.value)}
                   placeholder="Describe what happens at this timestamp..."
-                  className="text-sm min-h-[60px]"
+                  className="text-sm min-h-[144px]"
                 />
                 <div className="flex items-center gap-2">
                   <Button
@@ -487,7 +487,7 @@ export default function VideoDetail() {
                             onChange={(e) =>
                               setEditingFrameText(e.target.value)
                             }
-                            className="text-sm min-h-[60px]"
+                            className="text-sm min-h-[144px]"
                           />
                           <div className="flex items-center gap-2">
                             <Button
@@ -592,7 +592,7 @@ export default function VideoDetail() {
                   value={newTransContent}
                   onChange={(e) => setNewTransContent(e.target.value)}
                   placeholder="Enter the spoken content..."
-                  className="text-sm min-h-[60px]"
+                  className="text-sm min-h-[144px]"
                 />
                 <div className="flex items-center gap-2">
                   <Button
@@ -692,7 +692,7 @@ export default function VideoDetail() {
                         <Textarea
                           value={editingTransText}
                           onChange={(e) => setEditingTransText(e.target.value)}
-                          className="text-sm min-h-[60px]"
+                          className="text-sm min-h-[144px]"
                         />
                         <div className="flex items-center gap-2">
                           <Button

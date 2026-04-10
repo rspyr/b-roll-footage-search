@@ -163,7 +163,7 @@ async function describeFrame(imagePath: string): Promise<string> {
       },
     ],
     config: {
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,
     },
   });
 
@@ -195,7 +195,7 @@ Additionally, describe any CHANGES or PROGRESSION visible across the frames (e.g
     model: "gemini-2.5-flash",
     contents: [{ role: "user", parts }],
     config: {
-      maxOutputTokens: 1500,
+      maxOutputTokens: 4096,
     },
   });
 
