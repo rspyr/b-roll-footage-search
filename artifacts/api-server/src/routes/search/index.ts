@@ -159,18 +159,15 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       }
     }
 
-    const mergedMap = new Map<string, typeof allResults[0]>();
+    allResults.sort((a, b) => b.rank - a.rank);
+
+    const mergedMap = new Map<number, typeof allResults[0]>();
     for (const result of allResults) {
-      const key = `${result.videoId}-${result.timestampSec}`;
-      const existing = mergedMap.get(key);
+      const existing = mergedMap.get(result.videoId);
       if (existing) {
         existing.rank += result.rank;
-        if (result.source === "fts" && result.content) {
-          existing.content = result.content;
-          existing.type = result.type;
-        }
       } else {
-        mergedMap.set(key, { ...result });
+        mergedMap.set(result.videoId, { ...result });
       }
     }
 
