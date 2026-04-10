@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, videosTable, framesTable, transcriptionsTable, videoSegmentsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { downloadFile } from "./google-drive";
 import { logger } from "./logger";
 import { gemini } from "./gemini";

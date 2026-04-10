@@ -433,8 +433,14 @@ export default function Library() {
                               video.status === "processing") && (
                               <DropdownMenuItem
                                 onClick={() => handleCancel(video.id)}
+                                disabled={cancelMutation.isPending}
                               >
-                                <XCircle size={14} className="mr-2" /> Cancel
+                                {cancelMutation.isPending ? (
+                                  <Loader2 size={14} className="mr-2 animate-spin" />
+                                ) : (
+                                  <XCircle size={14} className="mr-2" />
+                                )}
+                                {cancelMutation.isPending ? "Cancelling..." : "Cancel"}
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
