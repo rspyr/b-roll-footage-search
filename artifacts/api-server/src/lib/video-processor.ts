@@ -538,6 +538,7 @@ export async function processVideo(videoId: number): Promise<void> {
         fs.unlinkSync(audioPath);
       }
     } catch (err) {
+      if (err instanceof CancellationError) throw err;
       logger.warn({ videoId, err }, "Audio extraction/transcription failed, continuing without transcription");
     }
 
@@ -549,6 +550,7 @@ export async function processVideo(videoId: number): Promise<void> {
       logger.info({ videoId, segmentCount: videoSegments.length }, "Video segmented");
 
       for (const seg of videoSegments) {
+        checkCancellation(videoId);
         try {
           const embedding = await embedVideoSegment(seg);
 
@@ -561,6 +563,7 @@ export async function processVideo(videoId: number): Promise<void> {
 
           logger.info({ videoId, startSec: seg.startSec, endSec: seg.endSec }, "Segment embedded and saved");
         } catch (err) {
+          if (err instanceof CancellationError) throw err;
           logger.error({ videoId, startSec: seg.startSec, err }, "Failed to embed video segment, skipping");
         }
 
@@ -576,8 +579,11 @@ export async function processVideo(videoId: number): Promise<void> {
         fs.rmdirSync(segDir);
       }
     } catch (err) {
+      if (err instanceof CancellationError) throw err;
       logger.error({ videoId, err }, "Video segmentation/embedding failed, continuing without embeddings");
     }
+
+    checkCancellation(videoId);
 
     const thumbnailPath = framePaths[0] ? path.relative(FRAMES_DIR, framePaths[0]) : null;
     await db.update(videosTable).set({
