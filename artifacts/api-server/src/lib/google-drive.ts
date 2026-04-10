@@ -115,7 +115,7 @@ export async function getFolderMetadata(folderId: string): Promise<DriveFolder> 
 
 export type DownloadProgressCallback = (bytesDownloaded: number, bytesTotal: number | null) => void;
 
-export async function downloadFile(fileId: string, destPath: string, onProgress?: DownloadProgressCallback): Promise<void> {
+export async function downloadFile(fileId: string, destPath: string, onProgress?: DownloadProgressCallback, signal?: AbortSignal): Promise<void> {
   const dir = path.dirname(destPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -124,6 +124,7 @@ export async function downloadFile(fileId: string, destPath: string, onProgress?
   const params = new URLSearchParams({ alt: "media" });
   const response = await connectors.proxy("google-drive", `/drive/v3/files/${fileId}?${params.toString()}`, {
     method: "GET",
+    signal: signal as any,
   });
 
   if (!response.ok) {

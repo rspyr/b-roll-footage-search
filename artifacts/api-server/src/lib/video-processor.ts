@@ -1,4 +1,4 @@
-import { execFile } from "child_process";
+import { execFile, type ChildProcess } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
@@ -11,6 +11,36 @@ import { gemini } from "./gemini";
 import { uploadFrame, deleteVideoFrames } from "./frame-storage";
 
 const execFileAsync = promisify(execFile);
+
+const videoAbortControllers = new Map<number, AbortController>();
+
+function execFileAbortable(
+  cmd: string,
+  args: string[],
+  signal?: AbortSignal,
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new CancellationError(-1));
+      return;
+    }
+    const child: ChildProcess = execFile(cmd, args, (err, stdout, stderr) => {
+      if (signal?.aborted) {
+        reject(new CancellationError(-1));
+        return;
+      }
+      if (err) reject(err);
+      else resolve({ stdout: stdout as string, stderr: stderr as string });
+    });
+    const onAbort = () => {
+      child.kill("SIGKILL");
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    child.on("exit", () => {
+      signal?.removeEventListener("abort", onAbort);
+    });
+  });
+}
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const VIDEOS_DIR = path.join(DATA_DIR, "videos");
@@ -50,6 +80,11 @@ const cancelledVideoIds = new Set<number>();
 
 export function requestCancellation(videoId: number): void {
   cancelledVideoIds.add(videoId);
+  const controller = videoAbortControllers.get(videoId);
+  if (controller) {
+    controller.abort();
+    videoAbortControllers.delete(videoId);
+  }
   if (currentProcessingState.videoId === videoId) {
     currentProcessingState.videoId = null;
     currentProcessingState.videoTitle = null;
@@ -98,30 +133,30 @@ function ensureDirs() {
   }
 }
 
-export async function getVideoDuration(videoPath: string): Promise<number> {
-  const { stdout } = await execFileAsync("ffprobe", [
+export async function getVideoDuration(videoPath: string, signal?: AbortSignal): Promise<number> {
+  const { stdout } = await execFileAbortable("ffprobe", [
     "-v", "quiet",
     "-show_entries", "format=duration",
     "-of", "default=noprint_wrappers=1:nokey=1",
     videoPath,
-  ]);
+  ], signal);
   return Math.floor(parseFloat(stdout.trim()));
 }
 
-export async function extractFrames(videoPath: string, videoId: number, intervalSec: number = 5): Promise<string[]> {
+export async function extractFrames(videoPath: string, videoId: number, intervalSec: number = 5, signal?: AbortSignal): Promise<string[]> {
   const framesDir = path.join(FRAMES_DIR, String(videoId));
   if (!fs.existsSync(framesDir)) {
     fs.mkdirSync(framesDir, { recursive: true });
   }
 
-  await execFileAsync("ffmpeg", [
+  await execFileAbortable("ffmpeg", [
     "-y",
     "-i", videoPath,
     "-vf", `fps=1/${intervalSec}`,
     "-q:v", "2",
     "-f", "image2",
     path.join(framesDir, "frame_%04d.jpg"),
-  ]);
+  ], signal);
 
   const files = fs.readdirSync(framesDir)
     .filter(f => f.startsWith("frame_") && f.endsWith(".jpg"))
@@ -130,10 +165,10 @@ export async function extractFrames(videoPath: string, videoId: number, interval
   return files.map(f => path.join(framesDir, f));
 }
 
-export async function extractAudio(videoPath: string, videoId: number): Promise<string> {
+export async function extractAudio(videoPath: string, videoId: number, signal?: AbortSignal): Promise<string> {
   const audioPath = path.join(VIDEOS_DIR, `${videoId}_audio.wav`);
 
-  await execFileAsync("ffmpeg", [
+  await execFileAbortable("ffmpeg", [
     "-i", videoPath,
     "-vn",
     "-acodec", "pcm_s16le",
@@ -141,7 +176,7 @@ export async function extractAudio(videoPath: string, videoId: number): Promise<
     "-ac", "1",
     "-y",
     audioPath,
-  ]);
+  ], signal);
 
   return audioPath;
 }
@@ -282,7 +317,7 @@ interface VideoSegmentInfo {
   filePath: string;
 }
 
-async function segmentVideo(videoPath: string, videoId: number, duration: number, onProgress?: (current: number, total: number) => void): Promise<VideoSegmentInfo[]> {
+async function segmentVideo(videoPath: string, videoId: number, duration: number, onProgress?: (current: number, total: number) => void, signal?: AbortSignal): Promise<VideoSegmentInfo[]> {
   logger.info({ videoId, duration }, "Starting video segmentation");
   const segDir = path.join(SEGMENTS_DIR, String(videoId));
   if (!fs.existsSync(segDir)) {
@@ -316,7 +351,7 @@ async function segmentVideo(videoPath: string, videoId: number, duration: number
     const endSec = Math.min(startSec + effectiveSegDuration, duration);
     const segmentPath = path.join(segDir, `segment_${String(segments.length).padStart(4, "0")}.mp4`);
 
-    await execFileAsync("ffmpeg", [
+    await execFileAbortable("ffmpeg", [
       "-y",
       "-i", videoPath,
       "-ss", String(startSec),
@@ -324,7 +359,7 @@ async function segmentVideo(videoPath: string, videoId: number, duration: number
       "-c", "copy",
       "-avoid_negative_ts", "make_zero",
       segmentPath,
-    ]);
+    ], signal);
 
     segments.push({ startSec, endSec, filePath: segmentPath });
 
@@ -426,6 +461,11 @@ class CancellationError extends Error {
   }
 }
 
+function isCancellationError(err: unknown): boolean {
+  return err instanceof CancellationError
+    || (err instanceof Error && err.name === "AbortError");
+}
+
 function checkCancellation(videoId: number): void {
   if (isCancelled(videoId)) {
     throw new CancellationError(videoId);
@@ -452,7 +492,12 @@ export async function processVideo(videoId: number): Promise<void> {
     .where(and(eq(videosTable.id, videoId), eq(videosTable.status, "pending")))
     .returning({ id: videosTable.id });
 
+  const abortController = new AbortController();
+  videoAbortControllers.set(videoId, abortController);
+  const signal = abortController.signal;
+
   if (claimed.length === 0) {
+    videoAbortControllers.delete(videoId);
     logger.info({ videoId, currentStatus: video.status }, "Video no longer pending, skipping processing");
     return;
   }
@@ -479,11 +524,11 @@ export async function processVideo(videoId: number): Promise<void> {
       logger.info({ videoId, driveFileId: video.driveFileId }, "Downloading video from Drive");
       await downloadFile(video.driveFileId, videoPath, (bytesDownloaded, bytesTotal) => {
         updateDownloadProgress(bytesDownloaded, bytesTotal);
-      });
+      }, signal);
       await db.update(videosTable).set({ localPath: videoPath }).where(eq(videosTable.id, videoId));
     }
 
-    const duration = await getVideoDuration(videoPath);
+    const duration = await getVideoDuration(videoPath, signal);
     await db.update(videosTable).set({ duration }).where(eq(videosTable.id, videoId));
     logger.info({ videoId, duration }, "Got video duration");
 
@@ -491,7 +536,7 @@ export async function processVideo(videoId: number): Promise<void> {
     checkCancellation(videoId);
     updateProcessingStep("Extracting frames");
     logger.info({ videoId, frameInterval, duration }, "Extracting frames");
-    let framePaths = await extractFrames(videoPath, videoId, frameInterval);
+    let framePaths = await extractFrames(videoPath, videoId, frameInterval, signal);
     logger.info({ videoId, frameCount: framePaths.length }, "Frames extracted");
 
     const MAX_FRAMES = 30;
@@ -581,7 +626,7 @@ export async function processVideo(videoId: number): Promise<void> {
     updateProcessingStep("Transcribing audio");
     logger.info({ videoId }, "Extracting and transcribing audio");
     try {
-      const audioPath = await extractAudio(videoPath, videoId);
+      const audioPath = await extractAudio(videoPath, videoId, signal);
       const segments = await transcribeAudio(audioPath);
 
       for (const segment of segments) {
@@ -598,7 +643,7 @@ export async function processVideo(videoId: number): Promise<void> {
         fs.unlinkSync(audioPath);
       }
     } catch (err) {
-      if (err instanceof CancellationError) throw err;
+      if (isCancellationError(err)) throw err;
       logger.warn({ videoId, err }, "Audio extraction/transcription failed, continuing without transcription");
     }
 
@@ -608,7 +653,7 @@ export async function processVideo(videoId: number): Promise<void> {
     try {
       const videoSegments = await segmentVideo(videoPath, videoId, duration, (current, total) => {
         updateSubstepProgress(current, total);
-      });
+      }, signal);
       logger.info({ videoId, segmentCount: videoSegments.length }, "Video segmented");
 
       updateProcessingStep("Generating embeddings");
@@ -628,7 +673,7 @@ export async function processVideo(videoId: number): Promise<void> {
 
           logger.info({ videoId, startSec: seg.startSec, endSec: seg.endSec }, "Segment embedded and saved");
         } catch (err) {
-          if (err instanceof CancellationError) throw err;
+          if (isCancellationError(err)) throw err;
           logger.error({ videoId, startSec: seg.startSec, err }, "Failed to embed video segment, skipping");
         }
 
@@ -645,7 +690,7 @@ export async function processVideo(videoId: number): Promise<void> {
         fs.rmdirSync(segDir);
       }
     } catch (err) {
-      if (err instanceof CancellationError) throw err;
+      if (isCancellationError(err)) throw err;
       logger.error({ videoId, err }, "Video segmentation/embedding failed, continuing without embeddings");
     }
 
@@ -667,6 +712,7 @@ export async function processVideo(videoId: number): Promise<void> {
     }
 
     cancelledVideoIds.delete(videoId);
+    videoAbortControllers.delete(videoId);
 
     currentProcessingState.videoId = null;
     currentProcessingState.videoTitle = null;
@@ -680,6 +726,8 @@ export async function processVideo(videoId: number): Promise<void> {
 
     logger.info({ videoId }, "Video processing completed");
   } catch (err) {
+    videoAbortControllers.delete(videoId);
+
     currentProcessingState.videoId = null;
     currentProcessingState.videoTitle = null;
     currentProcessingState.step = null;
@@ -690,7 +738,7 @@ export async function processVideo(videoId: number): Promise<void> {
     currentProcessingState.bytesDownloaded = null;
     currentProcessingState.bytesTotal = null;
 
-    if (err instanceof CancellationError) {
+    if (isCancellationError(err) || signal.aborted) {
       cancelledVideoIds.delete(videoId);
       await db.update(videosTable).set({ status: "cancelled" }).where(eq(videosTable.id, videoId));
       logger.info({ videoId }, "Video processing cancelled mid-pipeline");

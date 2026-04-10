@@ -49,7 +49,7 @@ A semantic video search application that connects to Google Drive, processes vid
 - `GET /api/videos` — List all synced videos (optional status filter)
 - `GET /api/videos/:id` — Video detail with frames and transcriptions
 - `POST /api/videos/:id/process` — Trigger video processing pipeline
-- `POST /api/videos/:id/cancel` — Cancel a pending or processing video (signals graceful abort for in-progress processing)
+- `POST /api/videos/:id/cancel` — Cancel a pending or processing video (immediately kills ffmpeg/download operations via AbortController, updates DB status, clears status bar, and restarts queue for next pending video)
 - `POST /api/videos/sync` — Sync videos from a Google Drive folder
 - `GET /api/drive/folders` — List Google Drive folders
 - `GET /api/drive/files?folderId=X` — List video files in a Drive folder
