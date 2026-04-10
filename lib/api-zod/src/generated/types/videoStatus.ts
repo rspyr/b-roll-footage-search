@@ -13,4 +13,5 @@ export const VideoStatus = {
   processing: "processing",
   completed: "completed",
   failed: "failed",
+  cancelled: "cancelled",
 } as const;

@@ -19,7 +19,9 @@ export const HealthCheckResponse = zod.object({
  * @summary List all videos
  */
 export const ListVideosQueryParams = zod.object({
-  status: zod.enum(["pending", "processing", "completed", "failed"]).optional(),
+  status: zod
+    .enum(["pending", "processing", "completed", "failed", "cancelled"])
+    .optional(),
 });
 
 export const ListVideosResponseItem = zod.object({
@@ -32,7 +34,13 @@ export const ListVideosResponseItem = zod.object({
   duration: zod.number().nullish(),
   localPath: zod.string().nullish(),
   thumbnailPath: zod.string().nullish(),
-  status: zod.enum(["pending", "processing", "completed", "failed"]),
+  status: zod.enum([
+    "pending",
+    "processing",
+    "completed",
+    "failed",
+    "cancelled",
+  ]),
   processingError: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -96,6 +104,19 @@ export const ProcessVideoResponse = zod.object({
 });
 
 /**
+ * @summary Cancel video processing
+ */
+export const CancelVideoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CancelVideoResponse = zod.object({
+  message: zod.string(),
+  videoId: zod.number(),
+  status: zod.string(),
+});
+
+/**
  * @summary Sync videos from a Google Drive folder
  */
 export const SyncVideosBody = zod.object({
@@ -115,7 +136,13 @@ export const SyncVideosResponse = zod.object({
       duration: zod.number().nullish(),
       localPath: zod.string().nullish(),
       thumbnailPath: zod.string().nullish(),
-      status: zod.enum(["pending", "processing", "completed", "failed"]),
+      status: zod.enum([
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "cancelled",
+      ]),
       processingError: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -330,7 +357,13 @@ export const ResyncFolderResponse = zod.object({
       duration: zod.number().nullish(),
       localPath: zod.string().nullish(),
       thumbnailPath: zod.string().nullish(),
-      status: zod.enum(["pending", "processing", "completed", "failed"]),
+      status: zod.enum([
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "cancelled",
+      ]),
       processingError: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),

@@ -391,6 +391,90 @@ export const useProcessVideo = <
 };
 
 /**
+ * @summary Cancel video processing
+ */
+export const getCancelVideoUrl = (id: number) => {
+  return `/api/videos/${id}/cancel`;
+};
+
+export const cancelVideo = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ProcessingResponse> => {
+  return customFetch<ProcessingResponse>(getCancelVideoUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCancelVideoMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelVideo>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelVideo>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["cancelVideo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelVideo>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return cancelVideo(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelVideoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelVideo>>
+>;
+
+export type CancelVideoMutationError = ErrorType<void>;
+
+/**
+ * @summary Cancel video processing
+ */
+export const useCancelVideo = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelVideo>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelVideo>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getCancelVideoMutationOptions(options));
+};
+
+/**
  * @summary Sync videos from a Google Drive folder
  */
 export const getSyncVideosUrl = () => {

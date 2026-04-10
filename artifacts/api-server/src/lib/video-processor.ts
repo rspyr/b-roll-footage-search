@@ -36,6 +36,16 @@ const currentProcessingState: ProcessingState = {
   startedAt: null,
 };
 
+const cancelledVideoIds = new Set<number>();
+
+export function requestCancellation(videoId: number): void {
+  cancelledVideoIds.add(videoId);
+}
+
+export function isCancelled(videoId: number): boolean {
+  return cancelledVideoIds.has(videoId);
+}
+
 export function getProcessingState(): ProcessingState {
   return { ...currentProcessingState };
 }
@@ -366,12 +376,32 @@ async function embedVideoSegment(segmentInfo: VideoSegmentInfo): Promise<number[
   }, 3, `embed-segment-${segmentInfo.startSec}s`);
 }
 
+class CancellationError extends Error {
+  constructor(videoId: number) {
+    super(`Video ${videoId} processing was cancelled`);
+    this.name = "CancellationError";
+  }
+}
+
+function checkCancellation(videoId: number): void {
+  if (isCancelled(videoId)) {
+    throw new CancellationError(videoId);
+  }
+}
+
 export async function processVideo(videoId: number): Promise<void> {
   ensureDirs();
 
   const [video] = await db.select().from(videosTable).where(eq(videosTable.id, videoId));
   if (!video) {
     throw new Error(`Video ${videoId} not found`);
+  }
+
+  if (isCancelled(videoId)) {
+    cancelledVideoIds.delete(videoId);
+    await db.update(videosTable).set({ status: "cancelled" }).where(eq(videosTable.id, videoId));
+    logger.info({ videoId }, "Video processing cancelled before start");
+    return;
   }
 
   await db.update(videosTable).set({ status: "processing" }).where(eq(videosTable.id, videoId));
@@ -390,6 +420,8 @@ export async function processVideo(videoId: number): Promise<void> {
 
   try {
 
+    checkCancellation(videoId);
+
     if (!videoPath || !fs.existsSync(videoPath)) {
       updateProcessingStep("Downloading from Drive");
       videoPath = path.join(VIDEOS_DIR, `${videoId}_${video.title.replace(/[^a-zA-Z0-9._-]/g, "_")}`);
@@ -403,6 +435,7 @@ export async function processVideo(videoId: number): Promise<void> {
     logger.info({ videoId, duration }, "Got video duration");
 
     const frameInterval = duration <= 30 ? 2 : (duration > 120 ? 10 : 5);
+    checkCancellation(videoId);
     updateProcessingStep("Extracting frames");
     logger.info({ videoId, frameInterval, duration }, "Extracting frames");
     let framePaths = await extractFrames(videoPath, videoId, frameInterval);
@@ -416,12 +449,14 @@ export async function processVideo(videoId: number): Promise<void> {
       framePaths = sampledPaths;
     }
 
+    checkCancellation(videoId);
     updateProcessingStep("Analyzing frames");
     logger.info({ videoId }, "Describing frames with Gemini Vision");
     const frameDescriptions: Array<{ framePath: string; description: string; frameIndex: number }> = [];
 
     let i = 0;
     while (i < framePaths.length) {
+      checkCancellation(videoId);
       const groupSize = Math.min(3, framePaths.length - i);
       const groupPaths = framePaths.slice(i, i + groupSize);
 
@@ -462,6 +497,7 @@ export async function processVideo(videoId: number): Promise<void> {
       await sleep(500);
     }
 
+    checkCancellation(videoId);
     updateProcessingStep("Uploading frames");
     logger.info({ videoId }, "Uploading frames to object storage");
     for (const { framePath, description, frameIndex } of frameDescriptions) {
@@ -481,6 +517,7 @@ export async function processVideo(videoId: number): Promise<void> {
       fs.rmSync(localFramesDir, { recursive: true, force: true });
     }
 
+    checkCancellation(videoId);
     updateProcessingStep("Transcribing audio");
     logger.info({ videoId }, "Extracting and transcribing audio");
     try {
@@ -504,6 +541,7 @@ export async function processVideo(videoId: number): Promise<void> {
       logger.warn({ videoId, err }, "Audio extraction/transcription failed, continuing without transcription");
     }
 
+    checkCancellation(videoId);
     updateProcessingStep("Generating embeddings");
     logger.info({ videoId }, "Segmenting video and generating embeddings");
     try {
@@ -556,6 +594,8 @@ export async function processVideo(videoId: number): Promise<void> {
       }
     }
 
+    cancelledVideoIds.delete(videoId);
+
     currentProcessingState.videoId = null;
     currentProcessingState.videoTitle = null;
     currentProcessingState.step = null;
@@ -567,6 +607,25 @@ export async function processVideo(videoId: number): Promise<void> {
     currentProcessingState.videoTitle = null;
     currentProcessingState.step = null;
     currentProcessingState.startedAt = null;
+
+    if (err instanceof CancellationError) {
+      cancelledVideoIds.delete(videoId);
+      await db.update(videosTable).set({ status: "cancelled" }).where(eq(videosTable.id, videoId));
+      logger.info({ videoId }, "Video processing cancelled mid-pipeline");
+
+      if (videoPath && fs.existsSync(videoPath)) {
+        try { fs.unlinkSync(videoPath); } catch (_) {}
+      }
+      const localFramesDir = path.join(FRAMES_DIR, String(videoId));
+      if (fs.existsSync(localFramesDir)) {
+        try { fs.rmSync(localFramesDir, { recursive: true, force: true }); } catch (_) {}
+      }
+      const segDir = path.join(SEGMENTS_DIR, String(videoId));
+      if (fs.existsSync(segDir)) {
+        try { fs.rmSync(segDir, { recursive: true, force: true }); } catch (_) {}
+      }
+      return;
+    }
 
     logger.error({ videoId, err }, "Video processing failed");
     await db.update(videosTable).set({

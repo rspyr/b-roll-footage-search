@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import {
   useListVideos,
   useProcessVideo,
+  useCancelVideo,
   useGetProcessingStatus,
   useListFolders,
   useRemoveFolder,
@@ -23,6 +24,8 @@ import {
   Trash2,
   ChevronLeft,
   FolderSync,
+  XCircle,
+  Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -173,8 +176,35 @@ export default function Library() {
     },
   });
 
+  const cancelMutation = useCancelVideo({
+    mutation: {
+      onSuccess: () => {
+        toast({
+          title: "Video Cancelled",
+          description: "Video processing has been cancelled.",
+        });
+        queryClient.invalidateQueries({ queryKey: getListVideosQueryKey() });
+        queryClient.invalidateQueries({
+          queryKey: getGetProcessingStatusQueryKey(),
+        });
+        queryClient.invalidateQueries({ queryKey: getListFoldersQueryKey() });
+      },
+      onError: () => {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to cancel video processing.",
+        });
+      },
+    },
+  });
+
   const handleProcess = (id: number) => {
     processMutation.mutate({ id });
+  };
+
+  const handleCancel = (id: number) => {
+    cancelMutation.mutate({ id });
   };
 
   const getStatusIcon = (s: string) => {
@@ -185,6 +215,8 @@ export default function Library() {
         return <Loader2 size={16} className="text-amber-500 animate-spin" />;
       case "failed":
         return <AlertCircle size={16} className="text-red-500" />;
+      case "cancelled":
+        return <Ban size={16} className="text-gray-500" />;
       default:
         return <Clock size={16} className="text-muted-foreground" />;
     }
@@ -397,6 +429,14 @@ export default function Library() {
                                 ? "Reprocess"
                                 : "Process Now"}
                             </DropdownMenuItem>
+                            {(video.status === "pending" ||
+                              video.status === "processing") && (
+                              <DropdownMenuItem
+                                onClick={() => handleCancel(video.id)}
+                              >
+                                <XCircle size={14} className="mr-2" /> Cancel
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

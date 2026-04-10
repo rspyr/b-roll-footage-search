@@ -45,7 +45,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, processing, completed, failed]
+            enum: [pending, processing, completed, failed, cancelled]
       responses:
         "200":
           description: List of videos
@@ -95,6 +95,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProcessingResponse"
+        "404":
+          description: Video not found
+
+  /videos/{id}/cancel:
+    post:
+      operationId: cancelVideo
+      tags: [videos]
+      summary: Cancel video processing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Video cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessingResponse"
+        "400":
+          description: Video cannot be cancelled
         "404":
           description: Video not found
 
@@ -423,7 +446,7 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          enum: [pending, processing, completed, failed]
+          enum: [pending, processing, completed, failed, cancelled]
         processingError:
           type: ["string", "null"]
         createdAt:

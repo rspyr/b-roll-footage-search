@@ -16,6 +16,7 @@ export const VideoStatus = {
   processing: "processing",
   completed: "completed",
   failed: "failed",
+  cancelled: "cancelled",
 } as const;
 
 export interface Video {
@@ -209,6 +210,7 @@ export const ListVideosStatus = {
   processing: "processing",
   completed: "completed",
   failed: "failed",
+  cancelled: "cancelled",
 } as const;
 
 export type ListDriveFoldersParams = {

@@ -8,7 +8,7 @@ import {
   SyncVideosBody,
 } from "@workspace/api-zod";
 import { listVideoFiles } from "../../lib/google-drive";
-import { processVideo, startProcessingQueue } from "../../lib/video-processor";
+import { processVideo, startProcessingQueue, requestCancellation, getProcessingState } from "../../lib/video-processor";
 import { syncRateLimit, processRateLimit } from "../../lib/rate-limit";
 
 const router: IRouter = Router();
@@ -81,6 +81,42 @@ router.post("/videos/:id/process", processRateLimit, async (req, res): Promise<v
     message: "Video queued for processing",
     videoId: params.data.id,
     status: "pending",
+  });
+});
+
+router.post("/videos/:id/cancel", processRateLimit, async (req, res): Promise<void> => {
+  const params = ProcessVideoParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [video] = await db.select().from(videosTable).where(eq(videosTable.id, params.data.id));
+  if (!video) {
+    res.status(404).json({ error: "Video not found" });
+    return;
+  }
+
+  if (video.status !== "pending" && video.status !== "processing") {
+    res.status(400).json({ error: `Cannot cancel video with status "${video.status}"` });
+    return;
+  }
+
+  requestCancellation(params.data.id);
+
+  const processingState = getProcessingState();
+  const isActivelyProcessing = video.status === "processing" && processingState.videoId === params.data.id;
+
+  if (!isActivelyProcessing) {
+    await db.update(videosTable)
+      .set({ status: "cancelled" })
+      .where(eq(videosTable.id, params.data.id));
+  }
+
+  res.json({
+    message: isActivelyProcessing ? "Video cancellation requested" : "Video cancelled",
+    videoId: params.data.id,
+    status: isActivelyProcessing ? "processing" : "cancelled",
   });
 });
 
