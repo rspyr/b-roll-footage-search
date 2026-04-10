@@ -33,6 +33,7 @@ export async function syncAllFolders(): Promise<void> {
 
     if (folderIds.length === 0) {
       logger.info("Auto-sync: no folders to sync");
+      lastSyncTimestamp = Date.now();
       return;
     }
 
