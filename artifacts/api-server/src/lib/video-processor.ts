@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { downloadFile } from "./google-drive";
 import { logger } from "./logger";
 import { gemini } from "./gemini";
+import { uploadFrame, deleteVideoFrames } from "./frame-storage";
 
 const execFileAsync = promisify(execFile);
 
@@ -332,6 +333,7 @@ export async function processVideo(videoId: number): Promise<void> {
   await db.delete(framesTable).where(eq(framesTable.videoId, videoId));
   await db.delete(transcriptionsTable).where(eq(transcriptionsTable.videoId, videoId));
   await db.delete(videoSegmentsTable).where(eq(videoSegmentsTable.videoId, videoId));
+  await deleteVideoFrames(videoId);
 
   try {
     let videoPath = video.localPath;
@@ -397,8 +399,10 @@ export async function processVideo(videoId: number): Promise<void> {
       await sleep(500);
     }
 
+    logger.info({ videoId }, "Uploading frames to object storage");
     for (const { framePath, description, frameIndex } of frameDescriptions) {
       const relativePath = path.relative(FRAMES_DIR, framePath);
+      await uploadFrame(framePath, relativePath);
       await db.insert(framesTable).values({
         videoId,
         timestampSec: frameIndex * frameInterval,
@@ -407,6 +411,11 @@ export async function processVideo(videoId: number): Promise<void> {
       });
     }
     logger.info({ videoId, describedCount: frameDescriptions.length }, "Frame descriptions saved");
+
+    const localFramesDir = path.join(FRAMES_DIR, String(videoId));
+    if (fs.existsSync(localFramesDir)) {
+      fs.rmSync(localFramesDir, { recursive: true, force: true });
+    }
 
     logger.info({ videoId }, "Extracting and transcribing audio");
     try {

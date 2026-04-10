@@ -5,6 +5,7 @@ import { getFolderMetadata, listVideoFiles } from "../../lib/google-drive";
 import { startProcessingQueue } from "../../lib/video-processor";
 import { syncRateLimit } from "../../lib/rate-limit";
 import { logger } from "../../lib/logger";
+import { deleteVideoFrames } from "../../lib/frame-storage";
 import fs from "fs";
 import path from "path";
 
@@ -76,6 +77,7 @@ router.delete("/folders/:folderId", async (req, res): Promise<void> => {
 
   for (const video of videos) {
     try {
+      await deleteVideoFrames(video.id);
       const framesDir = path.join(FRAMES_DIR, String(video.id));
       if (fs.existsSync(framesDir)) {
         fs.rmSync(framesDir, { recursive: true, force: true });

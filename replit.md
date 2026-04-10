@@ -78,9 +78,15 @@ A semantic video search application that connects to Google Drive, processes vid
 - **Fusion**: Results from both sources are combined using Reciprocal Rank Fusion (RRF), deduplicated by video+timestamp, and ranked
 - This means "dog sweating" can find clips of dogs panting because the video embedding captures semantic meaning beyond exact keywords
 
+### Frame Storage (Object Storage)
+- Extracted frame images are stored in **Replit Object Storage** (GCS-backed) for persistence across deployments
+- Frames are uploaded during video processing and served via `/api/frames/{imagePath}` streamed from GCS
+- Local frames are cleaned up after upload to object storage
+- `frame-storage.ts` handles upload, streaming, and deletion of frames in GCS
+- Bucket path: `frames/{videoId}/frame_XXXX.jpg`
+
 ### Key Directories
-- `data/videos/` — Downloaded video files
-- `data/frames/{videoId}/` — Extracted frame images per video
+- `data/videos/` — Downloaded video files (temporary, re-downloadable from Drive)
 - `data/segments/{videoId}/` — Temporary video segments for embedding (cleaned up after processing)
 
 ### Frontend (React + Vite)
@@ -100,6 +106,8 @@ A semantic video search application that connects to Google Drive, processes vid
 - `DATABASE_URL` — PostgreSQL connection string (runtime managed)
 - `GEMINI_API_KEY` — User's own Gemini API key for frame descriptions and video embeddings
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` / `AI_INTEGRATIONS_OPENAI_API_KEY` — OpenAI via Replit AI Integrations for audio transcription
+- `DEFAULT_OBJECT_STORAGE_BUCKET_ID` — GCS bucket for frame storage (auto-provisioned)
+- `PUBLIC_OBJECT_SEARCH_PATHS` / `PRIVATE_OBJECT_DIR` — Object storage paths (auto-provisioned)
 
 ## Production Hardening
 
