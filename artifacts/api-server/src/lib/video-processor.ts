@@ -50,6 +50,17 @@ const cancelledVideoIds = new Set<number>();
 
 export function requestCancellation(videoId: number): void {
   cancelledVideoIds.add(videoId);
+  if (currentProcessingState.videoId === videoId) {
+    currentProcessingState.videoId = null;
+    currentProcessingState.videoTitle = null;
+    currentProcessingState.step = null;
+    currentProcessingState.startedAt = null;
+    currentProcessingState.stepStartedAt = null;
+    currentProcessingState.current = null;
+    currentProcessingState.total = null;
+    currentProcessingState.bytesDownloaded = null;
+    currentProcessingState.bytesTotal = null;
+  }
 }
 
 export function isCancelled(videoId: number): boolean {
@@ -735,13 +746,20 @@ export async function processNextPending(): Promise<void> {
 }
 
 let processingActive = false;
+let queueGeneration = 0;
+
+export function invalidateQueue(): void {
+  processingActive = false;
+  queueGeneration++;
+}
 
 export async function startProcessingQueue(): Promise<void> {
   if (processingActive) return;
   processingActive = true;
+  const myGeneration = queueGeneration;
 
   try {
-    while (true) {
+    while (queueGeneration === myGeneration) {
       const [nextVideo] = await db.select().from(videosTable)
         .where(eq(videosTable.status, "pending"))
         .orderBy(videosTable.createdAt)
@@ -756,6 +774,8 @@ export async function startProcessingQueue(): Promise<void> {
       }
     }
   } finally {
-    processingActive = false;
+    if (queueGeneration === myGeneration) {
+      processingActive = false;
+    }
   }
 }

@@ -8,7 +8,7 @@ import {
   SyncVideosBody,
 } from "@workspace/api-zod";
 import { listVideoFiles } from "../../lib/google-drive";
-import { processVideo, startProcessingQueue, requestCancellation, getProcessingState } from "../../lib/video-processor";
+import { processVideo, startProcessingQueue, requestCancellation, getProcessingState, invalidateQueue } from "../../lib/video-processor";
 import { syncRateLimit, processRateLimit } from "../../lib/rate-limit";
 
 const router: IRouter = Router();
@@ -111,6 +111,10 @@ router.post("/videos/:id/cancel", processRateLimit, async (req, res): Promise<vo
 
   if (isActivelyProcessing) {
     requestCancellation(params.data.id);
+    invalidateQueue();
+    startProcessingQueue().catch(err => {
+      req.log.error({ err }, "Failed to restart processing queue after cancel");
+    });
   }
 
   res.json({
