@@ -184,6 +184,36 @@ export interface FolderResyncResult {
   videos: Video[];
 }
 
+export type SearchFeedbackBodyFeedbackType =
+  (typeof SearchFeedbackBodyFeedbackType)[keyof typeof SearchFeedbackBodyFeedbackType];
+
+export const SearchFeedbackBodyFeedbackType = {
+  up: "up",
+  down: "down",
+} as const;
+
+export interface SearchFeedbackBody {
+  videoId: number;
+  query: string;
+  feedbackType: SearchFeedbackBodyFeedbackType;
+}
+
+export interface SuccessResponse {
+  success: boolean;
+}
+
+export interface AnnotationItem {
+  id: number;
+  userId: number;
+  videoId: number;
+  content: string;
+  createdAt: string;
+}
+
+export interface AddAnnotationBody {
+  content: string;
+}
+
 export interface UpdateFrameBody {
   description: string;
 }
@@ -241,3 +271,9 @@ export const SearchContentType = {
   visual: "visual",
   audio: "audio",
 } as const;
+
+export type GetAnnotationStatusParams = {
+  videoIds: string;
+};
+
+export type GetAnnotationStatus200 = { [key: string]: number };

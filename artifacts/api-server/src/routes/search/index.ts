@@ -391,6 +391,44 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       }
     }
 
+    if (type === "all") {
+      const annotationFtsQuery = `
+        SELECT
+          va.video_id as "videoId",
+          v.title as "videoTitle",
+          v.drive_file_id as "driveFileId",
+          v.duration::double precision as "endSec",
+          va.content as content,
+          (SELECT f.image_path FROM frames f WHERE f.video_id = v.id ORDER BY f.timestamp_sec LIMIT 1) as "imagePath",
+          ts_rank(to_tsvector('english', va.content), plainto_tsquery('english', $1)) as rank
+        FROM video_annotations va
+        JOIN videos v ON v.id = va.video_id
+        WHERE to_tsvector('english', va.content) @@ plainto_tsquery('english', $1)
+        ORDER BY rank DESC
+        LIMIT $2
+      `;
+
+      const annotationFtsResult = await client.query(annotationFtsQuery, [expandedQuery, fetchLimit]);
+      const ANNOTATION_FTS_BOOST = 1.5;
+
+      for (let i = 0; i < annotationFtsResult.rows.length; i++) {
+        const row = annotationFtsResult.rows[i];
+        const rrfScore = (1 / (60 + i + 1)) * ANNOTATION_FTS_BOOST;
+        allResults.push({
+          type: "frame",
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
+          timestampSec: 0,
+          endSec: row.endSec != null ? Number(row.endSec) : null,
+          content: `Annotation match: ${String(row.content)}`,
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "annotation_fts",
+        });
+      }
+    }
+
     allResults.sort((a, b) => b.rank - a.rank);
 
     const mergedMap = new Map<number, typeof allResults[0]>();
@@ -400,6 +438,33 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
         existing.rank += result.rank;
       } else {
         mergedMap.set(result.videoId, { ...result });
+      }
+    }
+
+    const feedbackQuery = `
+      SELECT
+        video_id as "videoId",
+        feedback_type as "feedbackType",
+        count(*)::int as count
+      FROM search_feedback
+      WHERE to_tsvector('english', query) @@ plainto_tsquery('english', $1)
+      GROUP BY video_id, feedback_type
+    `;
+    const feedbackResult = await client.query(feedbackQuery, [q]);
+    const feedbackMap = new Map<number, { up: number; down: number }>();
+    for (const row of feedbackResult.rows) {
+      const vid = Number(row.videoId);
+      if (!feedbackMap.has(vid)) feedbackMap.set(vid, { up: 0, down: 0 });
+      const entry = feedbackMap.get(vid)!;
+      if (row.feedbackType === "up") entry.up = Number(row.count);
+      else if (row.feedbackType === "down") entry.down = Number(row.count);
+    }
+
+    const FEEDBACK_BOOST = 0.005;
+    for (const [videoId, merged] of mergedMap) {
+      const fb = feedbackMap.get(videoId);
+      if (fb) {
+        merged.rank += (fb.up - fb.down) * FEEDBACK_BOOST;
       }
     }
 
@@ -443,6 +508,51 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
     });
   } finally {
     client.release();
+  }
+});
+
+router.post("/search/feedback", async (req, res): Promise<void> => {
+  const { videoId, query, feedbackType } = req.body;
+
+  if (!videoId || !query || !feedbackType) {
+    res.status(400).json({ error: "videoId, query, and feedbackType are required" });
+    return;
+  }
+
+  if (feedbackType !== "up" && feedbackType !== "down") {
+    res.status(400).json({ error: "feedbackType must be 'up' or 'down'" });
+    return;
+  }
+
+  const userId = (req.session as any).userId as number;
+  const normalizedQuery = String(query).trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    res.status(400).json({ error: "query cannot be empty" });
+    return;
+  }
+
+  try {
+    const { searchFeedbackTable, videosTable, db } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+
+    const video = await db.select({ id: videosTable.id }).from(videosTable).where(eq(videosTable.id, Number(videoId))).limit(1);
+    if (video.length === 0) {
+      res.status(404).json({ error: "Video not found" });
+      return;
+    }
+
+    await db.insert(searchFeedbackTable).values({
+      userId,
+      videoId: Number(videoId),
+      query: normalizedQuery,
+      feedbackType,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err }, "Failed to submit search feedback");
+    res.status(500).json({ error: "Failed to submit feedback" });
   }
 });
 

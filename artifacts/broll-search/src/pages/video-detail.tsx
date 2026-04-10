@@ -11,6 +11,9 @@ import {
   getListVideosQueryKey,
   getListFoldersQueryKey,
   getSearchContentQueryKey,
+  useGetVideoAnnotations,
+  useAddVideoAnnotation,
+  getGetVideoAnnotationsQueryKey,
 } from "@workspace/api-client-react";
 import {
   Loader2,
@@ -25,6 +28,8 @@ import {
   X,
   Plus,
   RefreshCw,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { formatDuration, formatBytes, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -103,6 +108,7 @@ export default function VideoDetail() {
   const [editingFrameText, setEditingFrameText] = useState("");
   const [editingTransId, setEditingTransId] = useState<number | null>(null);
   const [editingTransText, setEditingTransText] = useState("");
+  const [newAnnotation, setNewAnnotation] = useState("");
   const [showAddFrame, setShowAddFrame] = useState(false);
   const [newFrameTs, setNewFrameTs] = useState("0");
   const [newFrameDesc, setNewFrameDesc] = useState("");
@@ -210,6 +216,27 @@ export default function VideoDetail() {
           variant: "destructive",
           title: "Error",
           description: "Failed to add transcription.",
+        });
+      },
+    },
+  });
+
+  const { data: annotations } = useGetVideoAnnotations(id, {
+    query: { enabled: !!id, queryKey: getGetVideoAnnotationsQueryKey(id) },
+  });
+
+  const addAnnotationMutation = useAddVideoAnnotation({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Note Added" });
+        setNewAnnotation("");
+        queryClient.invalidateQueries({ queryKey: getGetVideoAnnotationsQueryKey(id) });
+      },
+      onError: () => {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to add note.",
         });
       },
     },
@@ -736,6 +763,57 @@ export default function VideoDetail() {
               </div>
             )}
           </ScrollArea>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto w-full px-4 pb-4">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <div className="p-3 border-b border-border bg-muted/30 font-medium flex items-center gap-2">
+            <MessageSquare size={16} />
+            <span>Search Notes</span>
+            {annotations && annotations.length > 0 && (
+              <Badge variant="secondary" className="text-xs">{annotations.length}</Badge>
+            )}
+          </div>
+          <div className="p-4 space-y-3">
+            {annotations && annotations.length > 0 ? (
+              <div className="space-y-2">
+                {annotations.map((a: any) => (
+                  <div key={a.id} className="text-sm text-foreground bg-muted/50 rounded-md px-3 py-2 border border-border/50">
+                    {a.content}
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {formatDate(a.createdAt)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No notes yet. Add notes to help the search engine find this video better.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Textarea
+                value={newAnnotation}
+                onChange={(e) => setNewAnnotation(e.target.value)}
+                placeholder="Add a note (e.g. 'good for nature scenes', 'not useful for interviews')..."
+                className="text-sm min-h-[72px] flex-1 resize-none"
+              />
+              <Button
+                size="sm"
+                className="self-end"
+                disabled={!newAnnotation.trim() || addAnnotationMutation.isPending}
+                onClick={() => addAnnotationMutation.mutate({ id, data: { content: newAnnotation.trim() } })}
+              >
+                {addAnnotationMutation.isPending ? (
+                  <Loader2 size={14} className="animate-spin mr-1" />
+                ) : (
+                  <Send size={14} className="mr-1" />
+                )}
+                Add Note
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

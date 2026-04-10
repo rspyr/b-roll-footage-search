@@ -342,6 +342,60 @@ export const RemoveFolderResponse = zod.object({
 });
 
 /**
+ * @summary Submit thumbs up/down feedback on a search result
+ */
+export const SubmitSearchFeedbackBody = zod.object({
+  videoId: zod.number(),
+  query: zod.string(),
+  feedbackType: zod.enum(["up", "down"]),
+});
+
+export const SubmitSearchFeedbackResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary List annotations for a video
+ */
+export const GetVideoAnnotationsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetVideoAnnotationsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  videoId: zod.number(),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const GetVideoAnnotationsResponse = zod.array(
+  GetVideoAnnotationsResponseItem,
+);
+
+/**
+ * @summary Add an annotation note to a video
+ */
+export const AddVideoAnnotationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddVideoAnnotationBody = zod.object({
+  content: zod.string(),
+});
+
+/**
+ * @summary Check which videos have annotations
+ */
+export const GetAnnotationStatusQueryParams = zod.object({
+  videoIds: zod.coerce.string(),
+});
+
+export const GetAnnotationStatusResponse = zod.record(
+  zod.string(),
+  zod.number(),
+);
+
+/**
  * @summary Re-sync a folder to find new videos from Google Drive
  */
 export const ResyncFolderParams = zod.object({

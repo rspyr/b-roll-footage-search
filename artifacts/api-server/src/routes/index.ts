@@ -8,6 +8,7 @@ import processingRouter from "./processing";
 import foldersRouter from "./folders";
 import framesRouter from "./frames";
 import transcriptionsRouter from "./transcriptions";
+import annotationsRouter from "./annotations";
 import { requireAuth } from "../middleware/requireAuth";
 
 const router: IRouter = Router();
@@ -23,5 +24,6 @@ router.use(processingRouter);
 router.use(foldersRouter);
 router.use(framesRouter);
 router.use(transcriptionsRouter);
+router.use(annotationsRouter);
 
 export default router;

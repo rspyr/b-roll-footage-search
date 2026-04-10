@@ -394,6 +394,92 @@ paths:
         "404":
           description: Folder not found
 
+  /search/feedback:
+    post:
+      operationId: submitSearchFeedback
+      tags: [search]
+      summary: Submit thumbs up/down feedback on a search result
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchFeedbackBody"
+      responses:
+        "200":
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /videos/{id}/annotations:
+    get:
+      operationId: getVideoAnnotations
+      tags: [videos]
+      summary: List annotations for a video
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of annotations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnnotationItem"
+    post:
+      operationId: addVideoAnnotation
+      tags: [videos]
+      summary: Add an annotation note to a video
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAnnotationBody"
+      responses:
+        "201":
+          description: Annotation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnotationItem"
+        "404":
+          description: Video not found
+
+  /annotations/status:
+    get:
+      operationId: getAnnotationStatus
+      tags: [videos]
+      summary: Check which videos have annotations
+      parameters:
+        - name: videoIds
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Map of videoId to annotation count
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+
   /folders/{folderId}/sync:
     post:
       operationId: resyncFolder
@@ -772,6 +858,58 @@ components:
         - newVideoCount
         - totalInDrive
         - videos
+
+    SearchFeedbackBody:
+      type: object
+      properties:
+        videoId:
+          type: integer
+        query:
+          type: string
+        feedbackType:
+          type: string
+          enum: [up, down]
+      required:
+        - videoId
+        - query
+        - feedbackType
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    AnnotationItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        videoId:
+          type: integer
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - videoId
+        - content
+        - createdAt
+
+    AddAnnotationBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
 
     UpdateFrameBody:
       type: object

@@ -17,13 +17,17 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AddAnnotationBody,
   AddFrameBody,
   AddTranscriptionBody,
+  AnnotationItem,
   DriveFile,
   DriveFolder,
   FolderDeleteResult,
   FolderResyncResult,
   FrameItem,
+  GetAnnotationStatus200,
+  GetAnnotationStatusParams,
   HealthStatus,
   ListDriveFilesParams,
   ListDriveFoldersParams,
@@ -31,7 +35,9 @@ import type {
   ProcessingResponse,
   ProcessingStatus,
   SearchContentParams,
+  SearchFeedbackBody,
   SearchResults,
+  SuccessResponse,
   SyncRequest,
   SyncResponse,
   SyncedFolder,
@@ -1516,6 +1522,369 @@ export const useRemoveFolder = <
 > => {
   return useMutation(getRemoveFolderMutationOptions(options));
 };
+
+/**
+ * @summary Submit thumbs up/down feedback on a search result
+ */
+export const getSubmitSearchFeedbackUrl = () => {
+  return `/api/search/feedback`;
+};
+
+export const submitSearchFeedback = async (
+  searchFeedbackBody: SearchFeedbackBody,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getSubmitSearchFeedbackUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(searchFeedbackBody),
+  });
+};
+
+export const getSubmitSearchFeedbackMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitSearchFeedback>>,
+    TError,
+    { data: BodyType<SearchFeedbackBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitSearchFeedback>>,
+  TError,
+  { data: BodyType<SearchFeedbackBody> },
+  TContext
+> => {
+  const mutationKey = ["submitSearchFeedback"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitSearchFeedback>>,
+    { data: BodyType<SearchFeedbackBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitSearchFeedback(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitSearchFeedbackMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitSearchFeedback>>
+>;
+export type SubmitSearchFeedbackMutationBody = BodyType<SearchFeedbackBody>;
+export type SubmitSearchFeedbackMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit thumbs up/down feedback on a search result
+ */
+export const useSubmitSearchFeedback = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitSearchFeedback>>,
+    TError,
+    { data: BodyType<SearchFeedbackBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitSearchFeedback>>,
+  TError,
+  { data: BodyType<SearchFeedbackBody> },
+  TContext
+> => {
+  return useMutation(getSubmitSearchFeedbackMutationOptions(options));
+};
+
+/**
+ * @summary List annotations for a video
+ */
+export const getGetVideoAnnotationsUrl = (id: number) => {
+  return `/api/videos/${id}/annotations`;
+};
+
+export const getVideoAnnotations = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AnnotationItem[]> => {
+  return customFetch<AnnotationItem[]>(getGetVideoAnnotationsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVideoAnnotationsQueryKey = (id: number) => {
+  return [`/api/videos/${id}/annotations`] as const;
+};
+
+export const getGetVideoAnnotationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVideoAnnotations>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVideoAnnotations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetVideoAnnotationsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getVideoAnnotations>>
+  > = ({ signal }) => getVideoAnnotations(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVideoAnnotations>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVideoAnnotationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVideoAnnotations>>
+>;
+export type GetVideoAnnotationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List annotations for a video
+ */
+
+export function useGetVideoAnnotations<
+  TData = Awaited<ReturnType<typeof getVideoAnnotations>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVideoAnnotations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVideoAnnotationsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add an annotation note to a video
+ */
+export const getAddVideoAnnotationUrl = (id: number) => {
+  return `/api/videos/${id}/annotations`;
+};
+
+export const addVideoAnnotation = async (
+  id: number,
+  addAnnotationBody: AddAnnotationBody,
+  options?: RequestInit,
+): Promise<AnnotationItem> => {
+  return customFetch<AnnotationItem>(getAddVideoAnnotationUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addAnnotationBody),
+  });
+};
+
+export const getAddVideoAnnotationMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addVideoAnnotation>>,
+    TError,
+    { id: number; data: BodyType<AddAnnotationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addVideoAnnotation>>,
+  TError,
+  { id: number; data: BodyType<AddAnnotationBody> },
+  TContext
+> => {
+  const mutationKey = ["addVideoAnnotation"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addVideoAnnotation>>,
+    { id: number; data: BodyType<AddAnnotationBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addVideoAnnotation(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddVideoAnnotationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addVideoAnnotation>>
+>;
+export type AddVideoAnnotationMutationBody = BodyType<AddAnnotationBody>;
+export type AddVideoAnnotationMutationError = ErrorType<void>;
+
+/**
+ * @summary Add an annotation note to a video
+ */
+export const useAddVideoAnnotation = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addVideoAnnotation>>,
+    TError,
+    { id: number; data: BodyType<AddAnnotationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addVideoAnnotation>>,
+  TError,
+  { id: number; data: BodyType<AddAnnotationBody> },
+  TContext
+> => {
+  return useMutation(getAddVideoAnnotationMutationOptions(options));
+};
+
+/**
+ * @summary Check which videos have annotations
+ */
+export const getGetAnnotationStatusUrl = (
+  params: GetAnnotationStatusParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/annotations/status?${stringifiedParams}`
+    : `/api/annotations/status`;
+};
+
+export const getAnnotationStatus = async (
+  params: GetAnnotationStatusParams,
+  options?: RequestInit,
+): Promise<GetAnnotationStatus200> => {
+  return customFetch<GetAnnotationStatus200>(
+    getGetAnnotationStatusUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAnnotationStatusQueryKey = (
+  params?: GetAnnotationStatusParams,
+) => {
+  return [`/api/annotations/status`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAnnotationStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAnnotationStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetAnnotationStatusParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnnotationStatus>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAnnotationStatusQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAnnotationStatus>>
+  > = ({ signal }) =>
+    getAnnotationStatus(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAnnotationStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAnnotationStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAnnotationStatus>>
+>;
+export type GetAnnotationStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Check which videos have annotations
+ */
+
+export function useGetAnnotationStatus<
+  TData = Awaited<ReturnType<typeof getAnnotationStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetAnnotationStatusParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAnnotationStatus>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAnnotationStatusQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Re-sync a folder to find new videos from Google Drive

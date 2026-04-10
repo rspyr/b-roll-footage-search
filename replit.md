@@ -31,6 +31,8 @@ A semantic video search application that connects to Google Drive, processes vid
 - **frames** — Extracted frames with timestamps, image paths, Gemini-generated descriptions. GIN index on description tsvector for full-text search.
 - **transcriptions** — Audio transcription segments with start/end timestamps. GIN index on content tsvector for full-text search.
 - **video_segments** — Video segment embeddings for semantic vector search. Each row stores a segment's start/end timestamps and a 768-dimensional vector embedding from `gemini-embedding-2-preview`. HNSW index on embedding column for fast cosine similarity search.
+- **search_feedback** — Thumbs up/down feedback on search results. Stacking design (multiple rows per user/video/query compound the effect). GIN index on query tsvector for FTS-based similarity matching during search.
+- **video_annotations** — Free-text notes on videos that become an additional search channel. GIN indexes on content tsvector (FTS) and trigram (fuzzy). Adding an annotation also regenerates the video's AI concept tags.
 
 ### Authentication
 - Custom email/password auth restricted to `@hvaclaunch.ai` domain
@@ -64,6 +66,10 @@ A semantic video search application that connects to Google Drive, processes vid
 - `PATCH /api/transcriptions/:id` — Update a transcription segment's content
 - `POST /api/videos/:id/transcriptions` — Add a manual transcription segment to a video
 - `POST /api/videos/backfill-tags` — Generate AI concept tags for all completed videos missing tags (runs async in background)
+- `POST /api/search/feedback` — Submit thumbs up/down feedback on a search result (stacking: repeated clicks compound the effect)
+- `GET /api/videos/:id/annotations` — List annotations for a video
+- `POST /api/videos/:id/annotations` — Add an annotation note to a video (also regenerates AI tags)
+- `GET /api/annotations/status?videoIds=1,2,3` — Check which videos have annotations (returns map of videoId to count)
 
 ### Processing Pipeline
 1. Download video from Google Drive
@@ -82,7 +88,9 @@ A semantic video search application that connects to Google Drive, processes vid
 - **Fuzzy matching**: `pg_trgm` word_similarity matching on titles, frame descriptions, and tags
 - **Tag search**: AI-generated concept tags searched via FTS (2x boost) and fuzzy matching (1x)
 - **Fusion**: Results from all sources combined using Reciprocal Rank Fusion (RRF), deduplicated by video, and ranked
-- **RRF boosts**: Title FTS (3x), Title fuzzy (2x), Tag FTS (2x), Vector (1x), Frame FTS (1x), Transcription FTS (1x), Tag fuzzy (1x), Desc fuzzy (1x)
+- **Annotation FTS**: User-submitted notes on videos are searched via FTS (1.5x boost) as an additional search channel
+- **Feedback adjustment**: Thumbs up/down feedback shifts RRF scores (±0.005 per vote) using FTS similarity matching on stored queries
+- **RRF boosts**: Title FTS (3x), Title fuzzy (2x), Tag FTS (2x), Annotation FTS (1.5x), Vector (1x), Frame FTS (1x), Transcription FTS (1x), Tag fuzzy (1x), Desc fuzzy (1x)
 - This means "game" can find "Rock Paper Scissors.mp4" because concept tags capture abstract relationships
 
 ### Frame Storage (Object Storage)

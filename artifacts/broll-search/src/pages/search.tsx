@@ -1,11 +1,22 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
-import { useSearchContent, getSearchContentQueryKey } from "@workspace/api-client-react";
-import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info } from "lucide-react";
+import {
+  useSearchContent,
+  getSearchContentQueryKey,
+  useSubmitSearchFeedback,
+  useGetAnnotationStatus,
+  useGetVideoAnnotations,
+  useAddVideoAnnotation,
+  getGetVideoAnnotationsQueryKey,
+  getGetAnnotationStatusQueryKey,
+} from "@workspace/api-client-react";
+import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { formatDuration } from "@/lib/format";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SearchResultItem {
   videoId: number;
@@ -129,6 +140,78 @@ function CopyDriveLinkButton({ driveFileId }: { driveFileId: string }) {
   );
 }
 
+function AnnotationPanel({
+  videoId,
+  onClose,
+}: {
+  videoId: number;
+  onClose: () => void;
+}) {
+  const [noteText, setNoteText] = useState("");
+  const queryClient = useQueryClient();
+  const { data: annotations, isLoading } = useGetVideoAnnotations(videoId, {
+    query: { queryKey: getGetVideoAnnotationsQueryKey(videoId) },
+  });
+
+  const addMutation = useAddVideoAnnotation({
+    mutation: {
+      onSuccess: () => {
+        setNoteText("");
+        queryClient.invalidateQueries({ queryKey: getGetVideoAnnotationsQueryKey(videoId) });
+        queryClient.invalidateQueries({ queryKey: getGetAnnotationStatusQueryKey() });
+      },
+    },
+  });
+
+  return (
+    <div
+      className="border-t border-border bg-muted/30 p-3 space-y-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">Notes</span>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <X size={14} />
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 size={12} className="animate-spin" /> Loading...
+        </div>
+      ) : annotations && annotations.length > 0 ? (
+        <div className="space-y-1.5 max-h-32 overflow-y-auto">
+          {annotations.map((a: any) => (
+            <div key={a.id} className="text-xs text-foreground bg-background rounded px-2 py-1.5 border border-border/50">
+              {a.content}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground italic">No notes yet.</p>
+      )}
+
+      <div className="flex gap-1.5">
+        <Textarea
+          value={noteText}
+          onChange={(e) => setNoteText(e.target.value)}
+          placeholder="Add a note to improve search..."
+          className="text-xs min-h-[56px] flex-1 resize-none"
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-auto px-2 self-end"
+          disabled={!noteText.trim() || addMutation.isPending}
+          onClick={() => addMutation.mutate({ id: videoId, data: { content: noteText.trim() } })}
+        >
+          {addMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function SearchResults({
   results,
   total,
@@ -147,6 +230,31 @@ function SearchResults({
     return Math.max(...results.map(r => r.rank));
   }, [results]);
 
+  const queryClient = useQueryClient();
+  const [openAnnotation, setOpenAnnotation] = useState<number | null>(null);
+
+  const videoIds = useMemo(() => [...new Set(results.map(r => r.videoId))], [results]);
+  const { data: annotationStatus } = useGetAnnotationStatus(
+    { videoIds: videoIds.join(",") },
+    { query: { enabled: videoIds.length > 0, queryKey: getGetAnnotationStatusQueryKey({ videoIds: videoIds.join(",") }) } }
+  );
+
+  const feedbackMutation = useSubmitSearchFeedback({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getSearchContentQueryKey() });
+      },
+    },
+  });
+
+  const [feedbackFlash, setFeedbackFlash] = useState<Record<string, "up" | "down" | null>>({});
+  const handleFeedback = (videoId: number, type: "up" | "down") => {
+    const key = `${videoId}-${type}`;
+    setFeedbackFlash(prev => ({ ...prev, [key]: type }));
+    setTimeout(() => setFeedbackFlash(prev => ({ ...prev, [key]: null })), 600);
+    feedbackMutation.mutate({ data: { videoId, query, feedbackType: type } });
+  };
+
   return (
     <>
       <div className="text-sm text-muted-foreground">
@@ -154,7 +262,9 @@ function SearchResults({
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {results.map((result, i) => (
+        {results.map((result, i) => {
+          const hasAnnotations = annotationStatus && (annotationStatus as any)[String(result.videoId)] > 0;
+          return (
           <div 
             key={i} 
             className="flex flex-col rounded-lg border border-border bg-card overflow-hidden cursor-pointer hover:border-primary/50 transition-colors shadow-sm"
@@ -179,6 +289,47 @@ function SearchResults({
                   {formatDuration(result.timestampSec)}
                   {result.endSec && ` - ${formatDuration(result.endSec)}`}
                 </span>
+              </div>
+
+              <div className="absolute top-2 left-2 flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFeedback(result.videoId, "up");
+                  }}
+                  className={`p-1.5 rounded-md text-white transition-colors ${
+                    feedbackFlash[`${result.videoId}-up`] ? "bg-green-600/90" : "bg-black/60 hover:bg-green-600/80"
+                  }`}
+                  title="This result is relevant"
+                >
+                  <ThumbsUp size={14} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFeedback(result.videoId, "down");
+                  }}
+                  className={`p-1.5 rounded-md text-white transition-colors ${
+                    feedbackFlash[`${result.videoId}-down`] ? "bg-red-600/90" : "bg-black/60 hover:bg-red-600/80"
+                  }`}
+                  title="This result is not relevant"
+                >
+                  <ThumbsDown size={14} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenAnnotation(openAnnotation === result.videoId ? null : result.videoId);
+                  }}
+                  className={`p-1.5 rounded-md transition-colors text-white ${
+                    hasAnnotations
+                      ? "bg-amber-500/80 hover:bg-amber-600/90"
+                      : "bg-black/60 hover:bg-black/80"
+                  }`}
+                  title={hasAnnotations ? "View/add notes" : "Add a note"}
+                >
+                  <MessageSquare size={14} />
+                </button>
               </div>
               
               <div className="absolute top-2 right-2 flex items-center gap-1.5">
@@ -224,8 +375,13 @@ function SearchResults({
                 View details <ArrowRight size={14} className="ml-1 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
+
+            {openAnnotation === result.videoId && (
+              <AnnotationPanel videoId={result.videoId} onClose={() => setOpenAnnotation(null)} />
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );

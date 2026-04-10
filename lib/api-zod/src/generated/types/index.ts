@@ -6,13 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./addAnnotationBody";
 export * from "./addFrameBody";
 export * from "./addTranscriptionBody";
+export * from "./annotationItem";
 export * from "./driveFile";
 export * from "./driveFolder";
 export * from "./folderDeleteResult";
 export * from "./folderResyncResult";
 export * from "./frameItem";
+export * from "./getAnnotationStatus200";
+export * from "./getAnnotationStatusParams";
 export * from "./healthStatus";
 export * from "./listDriveFilesParams";
 export * from "./listDriveFoldersParams";
@@ -23,9 +27,12 @@ export * from "./processingStatus";
 export * from "./processingStatusCurrentVideo";
 export * from "./searchContentParams";
 export * from "./searchContentType";
+export * from "./searchFeedbackBody";
+export * from "./searchFeedbackBodyFeedbackType";
 export * from "./searchResult";
 export * from "./searchResults";
 export * from "./searchResultType";
+export * from "./successResponse";
 export * from "./syncedFolder";
 export * from "./syncRequest";
 export * from "./syncResponse";
