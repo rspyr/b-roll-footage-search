@@ -10,6 +10,7 @@ import {
   getGetVideoAnnotationsQueryKey,
   getGetAnnotationStatusQueryKey,
 } from "@workspace/api-client-react";
+import type { AnnotationItem, GetAnnotationStatus200 } from "@workspace/api-client-react";
 import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -181,7 +182,7 @@ function AnnotationPanel({
         </div>
       ) : annotations && annotations.length > 0 ? (
         <div className="space-y-1.5 max-h-32 overflow-y-auto">
-          {annotations.map((a: any) => (
+          {annotations.map((a: AnnotationItem) => (
             <div key={a.id} className="text-xs text-foreground bg-background rounded px-2 py-1.5 border border-border/50">
               {a.content}
             </div>
@@ -263,7 +264,8 @@ function SearchResults({
       
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {results.map((result, i) => {
-          const hasAnnotations = annotationStatus && (annotationStatus as any)[String(result.videoId)] > 0;
+          const statusMap = annotationStatus as GetAnnotationStatus200 | undefined;
+          const hasAnnotations = statusMap && statusMap[String(result.videoId)] > 0;
           return (
           <div 
             key={i} 

@@ -15,6 +15,7 @@ import {
   useAddVideoAnnotation,
   getGetVideoAnnotationsQueryKey,
 } from "@workspace/api-client-react";
+import type { AnnotationItem } from "@workspace/api-client-react";
 import {
   Loader2,
   ArrowLeft,
@@ -778,7 +779,7 @@ export default function VideoDetail() {
           <div className="p-4 space-y-3">
             {annotations && annotations.length > 0 ? (
               <div className="space-y-2">
-                {annotations.map((a: any) => (
+                {annotations.map((a: AnnotationItem) => (
                   <div key={a.id} className="text-sm text-foreground bg-muted/50 rounded-md px-3 py-2 border border-border/50">
                     {a.content}
                     <div className="text-xs text-muted-foreground mt-1">

@@ -1,11 +1,41 @@
 import { Router, type IRouter } from "express";
-import { db, videoAnnotationsTable, videosTable } from "@workspace/db";
+import { db, videoAnnotationsTable, videosTable, framesTable, transcriptionsTable } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
-import { gemini } from "../../lib/gemini";
 import { logger } from "../../lib/logger";
 import { generateVideoTags } from "../../lib/video-processor";
 
 const router: IRouter = Router();
+
+async function regenerateTagsForVideo(videoId: number): Promise<void> {
+  const [video] = await db.select().from(videosTable).where(eq(videosTable.id, videoId)).limit(1);
+  if (!video) return;
+
+  const frames = await db
+    .select({ description: framesTable.description })
+    .from(framesTable)
+    .where(eq(framesTable.videoId, videoId));
+
+  const transcriptions = await db
+    .select({ content: transcriptionsTable.content })
+    .from(transcriptionsTable)
+    .where(eq(transcriptionsTable.videoId, videoId));
+
+  const annotations = await db
+    .select({ content: videoAnnotationsTable.content })
+    .from(videoAnnotationsTable)
+    .where(eq(videoAnnotationsTable.videoId, videoId));
+
+  const frameDescriptions = frames
+    .map(f => f.description)
+    .filter((d): d is string => d !== null && d !== undefined);
+
+  const transcriptionTexts = transcriptions.map(t => t.content);
+  const annotationTexts = annotations.map(a => a.content);
+  const allTexts = [...transcriptionTexts, ...annotationTexts];
+
+  const tags = await generateVideoTags(video.title, frameDescriptions, allTexts);
+  await db.update(videosTable).set({ tags }).where(eq(videosTable.id, videoId));
+}
 
 router.post("/videos/:id/annotations", async (req, res): Promise<void> => {
   const videoId = parseInt(req.params.id);
@@ -36,7 +66,7 @@ router.post("/videos/:id/annotations", async (req, res): Promise<void> => {
     }).returning();
 
     try {
-      await generateVideoTags(videoId);
+      await regenerateTagsForVideo(videoId);
       logger.info({ videoId, annotationId: annotation.id }, "Regenerated tags after annotation");
     } catch (err) {
       logger.warn({ err, videoId }, "Failed to regenerate tags after annotation (non-fatal)");
@@ -56,13 +86,18 @@ router.get("/videos/:id/annotations", async (req, res): Promise<void> => {
     return;
   }
 
-  const annotations = await db
-    .select()
-    .from(videoAnnotationsTable)
-    .where(eq(videoAnnotationsTable.videoId, videoId))
-    .orderBy(sql`${videoAnnotationsTable.createdAt} DESC`);
+  try {
+    const annotations = await db
+      .select()
+      .from(videoAnnotationsTable)
+      .where(eq(videoAnnotationsTable.videoId, videoId))
+      .orderBy(sql`${videoAnnotationsTable.createdAt} DESC`);
 
-  res.json(annotations);
+    res.json(annotations);
+  } catch (err) {
+    logger.error({ err, videoId }, "Failed to fetch annotations");
+    res.status(500).json({ error: "Failed to fetch annotations" });
+  }
 });
 
 router.get("/annotations/status", async (req, res): Promise<void> => {
@@ -78,21 +113,26 @@ router.get("/annotations/status", async (req, res): Promise<void> => {
     return;
   }
 
-  const results = await db
-    .select({
-      videoId: videoAnnotationsTable.videoId,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(videoAnnotationsTable)
-    .where(inArray(videoAnnotationsTable.videoId, ids))
-    .groupBy(videoAnnotationsTable.videoId);
+  try {
+    const results = await db
+      .select({
+        videoId: videoAnnotationsTable.videoId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(videoAnnotationsTable)
+      .where(inArray(videoAnnotationsTable.videoId, ids))
+      .groupBy(videoAnnotationsTable.videoId);
 
-  const statusMap: Record<number, number> = {};
-  for (const r of results) {
-    statusMap[r.videoId] = r.count;
+    const statusMap: Record<number, number> = {};
+    for (const r of results) {
+      statusMap[r.videoId] = r.count;
+    }
+
+    res.json(statusMap);
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch annotation status");
+    res.status(500).json({ error: "Failed to fetch annotation status" });
   }
-
-  res.json(statusMap);
 });
 
 export default router;
