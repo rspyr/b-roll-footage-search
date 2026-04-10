@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, videosTable } from "@workspace/db";
 import { getProcessingState } from "../../lib/video-processor";
 
@@ -21,9 +21,24 @@ router.get("/processing-status", async (_req, res): Promise<void> => {
   const row = result.rows[0];
   const processingState = getProcessingState();
 
+  let pending = Number(row.pending);
+  let processing = Number(row.processing);
+
+  if (processingState.videoId) {
+    const [activeVideo] = await db
+      .select({ status: videosTable.status })
+      .from(videosTable)
+      .where(eq(videosTable.id, processingState.videoId));
+
+    if (activeVideo && activeVideo.status === "pending") {
+      pending = Math.max(0, pending - 1);
+      processing = processing + 1;
+    }
+  }
+
   res.json({
-    pending: Number(row.pending),
-    processing: Number(row.processing),
+    pending,
+    processing,
     completed: Number(row.completed),
     failed: Number(row.failed),
     total: Number(row.total),

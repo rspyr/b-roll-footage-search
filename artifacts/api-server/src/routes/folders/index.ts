@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, sql, and, inArray } from "drizzle-orm";
 import { db, videosTable, framesTable, transcriptionsTable } from "@workspace/db";
 import { getFolderMetadata, listVideoFiles } from "../../lib/google-drive";
-import { startProcessingQueue } from "../../lib/video-processor";
+import { startProcessingQueue, getProcessingState } from "../../lib/video-processor";
 import { syncRateLimit } from "../../lib/rate-limit";
 import { logger } from "../../lib/logger";
 import { deleteVideoFrames } from "../../lib/frame-storage";
@@ -27,6 +27,22 @@ router.get("/folders", async (req, res): Promise<void> => {
     .from(videosTable)
     .groupBy(videosTable.driveFolderId);
 
+  const processingState = getProcessingState();
+  let activeVideoFolderId: string | null = null;
+  let needsReconciliation = false;
+
+  if (processingState.videoId) {
+    const [activeVideo] = await db
+      .select({ status: videosTable.status, driveFolderId: videosTable.driveFolderId })
+      .from(videosTable)
+      .where(eq(videosTable.id, processingState.videoId));
+
+    if (activeVideo && activeVideo.status === "pending" && activeVideo.driveFolderId) {
+      activeVideoFolderId = activeVideo.driveFolderId;
+      needsReconciliation = true;
+    }
+  }
+
   const folders = await Promise.all(
     rows
       .filter((r) => r.driveFolderId != null)
@@ -39,13 +55,19 @@ router.get("/folders", async (req, res): Promise<void> => {
           logger.warn({ folderId: row.driveFolderId }, "Could not fetch folder name from Drive");
         }
 
+        let { processingCount, pendingCount } = row;
+        if (needsReconciliation && row.driveFolderId === activeVideoFolderId) {
+          pendingCount = Math.max(0, pendingCount - 1);
+          processingCount = processingCount + 1;
+        }
+
         return {
           driveFolderId: row.driveFolderId!,
           name: folderName,
           videoCount: row.videoCount,
           completedCount: row.completedCount,
-          processingCount: row.processingCount,
-          pendingCount: row.pendingCount,
+          processingCount,
+          pendingCount,
           failedCount: row.failedCount,
         };
       }),

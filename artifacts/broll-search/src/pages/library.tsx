@@ -320,7 +320,13 @@ export default function Library() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  folderVideos.map((video) => (
+                  folderVideos.map((video) => {
+                    const displayStatus =
+                      video.status === "pending" &&
+                      status?.currentVideo?.id === video.id
+                        ? "processing"
+                        : video.status;
+                    return (
                     <TableRow
                       key={video.id}
                       className="cursor-pointer hover:bg-muted/50"
@@ -349,9 +355,9 @@ export default function Library() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {getStatusIcon(video.status)}
+                          {getStatusIcon(displayStatus)}
                           <span className="capitalize text-sm">
-                            {video.status}
+                            {displayStatus}
                           </span>
                         </div>
                       </TableCell>
@@ -395,7 +401,8 @@ export default function Library() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
