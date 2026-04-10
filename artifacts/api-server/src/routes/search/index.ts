@@ -33,7 +33,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
 
   const { q, type = "all", limit = 20, offset = 0 } = params.data;
 
-  const fetchLimit = limit + offset + 20;
+  const fetchLimit = (limit + offset) * 5 + 50;
 
   const queryEmbedding = await embedQuery(q);
 
