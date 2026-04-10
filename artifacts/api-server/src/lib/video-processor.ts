@@ -644,7 +644,7 @@ export async function processVideo(videoId: number): Promise<void> {
     await db.update(videosTable).set({
       status: "completed",
       thumbnailPath,
-    }).where(eq(videosTable.id, videoId));
+    }).where(and(eq(videosTable.id, videoId), eq(videosTable.status, "processing")));
 
     if (videoPath && fs.existsSync(videoPath)) {
       try {
@@ -702,7 +702,7 @@ export async function processVideo(videoId: number): Promise<void> {
     await db.update(videosTable).set({
       status: "failed",
       processingError: err instanceof Error ? err.message : String(err),
-    }).where(eq(videosTable.id, videoId));
+    }).where(and(eq(videosTable.id, videoId), eq(videosTable.status, "processing")));
 
     if (videoPath && fs.existsSync(videoPath)) {
       try {

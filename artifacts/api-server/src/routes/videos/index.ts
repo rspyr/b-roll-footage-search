@@ -105,18 +105,18 @@ router.post("/videos/:id/cancel", processRateLimit, async (req, res): Promise<vo
   const processingState = getProcessingState();
   const isActivelyProcessing = video.status === "processing" && processingState.videoId === params.data.id;
 
+  await db.update(videosTable)
+    .set({ status: "cancelled" })
+    .where(eq(videosTable.id, params.data.id));
+
   if (isActivelyProcessing) {
     requestCancellation(params.data.id);
-  } else {
-    await db.update(videosTable)
-      .set({ status: "cancelled" })
-      .where(eq(videosTable.id, params.data.id));
   }
 
   res.json({
-    message: isActivelyProcessing ? "Video cancellation requested" : "Video cancelled",
+    message: "Video cancelled",
     videoId: params.data.id,
-    status: isActivelyProcessing ? "processing" : "cancelled",
+    status: "cancelled",
   });
 });
 
