@@ -3,6 +3,7 @@ import { eq, sql, and, inArray } from "drizzle-orm";
 import { db, videosTable, framesTable, transcriptionsTable } from "@workspace/db";
 import { getFolderMetadata, listVideoFiles } from "../../lib/google-drive";
 import { startProcessingQueue, getProcessingState } from "../../lib/video-processor";
+import { syncAllFolders } from "../../lib/auto-sync";
 import { syncRateLimit } from "../../lib/rate-limit";
 import { logger } from "../../lib/logger";
 import { deleteVideoFrames } from "../../lib/frame-storage";
@@ -117,6 +118,33 @@ router.delete("/folders/:folderId", async (req, res): Promise<void> => {
   }
 
   res.json({ deletedCount: videos.length });
+});
+
+router.post("/folders/sync-all", syncRateLimit, async (req, res): Promise<void> => {
+  try {
+    const result = await syncAllFolders();
+
+    if (result.skipped) {
+      res.json({
+        newVideoCount: 0,
+        folderCount: result.folderCount,
+        message: "Sync was recently performed. Please wait a few minutes before trying again.",
+      });
+      return;
+    }
+
+    res.json({
+      newVideoCount: result.newVideoCount,
+      folderCount: result.folderCount,
+      message:
+        result.newVideoCount > 0
+          ? `Found ${result.newVideoCount} new video${result.newVideoCount !== 1 ? "s" : ""} across ${result.folderCount} folder${result.folderCount !== 1 ? "s" : ""}.`
+          : "All folders are up to date.",
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to sync all folders");
+    res.status(500).json({ error: "Failed to sync folders from Google Drive" });
+  }
 });
 
 router.post("/folders/:folderId/sync", syncRateLimit, async (req, res): Promise<void> => {

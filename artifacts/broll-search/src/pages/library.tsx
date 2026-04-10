@@ -8,6 +8,7 @@ import {
   useListFolders,
   useRemoveFolder,
   useResyncFolder,
+  useSyncAllFolders,
   getListVideosQueryKey,
   getGetProcessingStatusQueryKey,
   getListFoldersQueryKey,
@@ -176,6 +177,29 @@ export default function Library() {
     },
   });
 
+  const syncAllMutation = useSyncAllFolders({
+    mutation: {
+      onSuccess: (data) => {
+        toast({
+          title: "Sync Complete",
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: getListFoldersQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListVideosQueryKey() });
+        queryClient.invalidateQueries({
+          queryKey: getGetProcessingStatusQueryKey(),
+        });
+      },
+      onError: () => {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to sync folders from Google Drive.",
+        });
+      },
+    },
+  });
+
   const cancelMutation = useCancelVideo({
     mutation: {
       onSuccess: () => {
@@ -264,8 +288,21 @@ export default function Library() {
             )}
           </div>
 
-          <Button onClick={() => setLocation("/settings")}>
-            Sync from Drive
+          <Button
+            onClick={() => syncAllMutation.mutate()}
+            disabled={syncAllMutation.isPending}
+          >
+            {syncAllMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Syncing…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Sync from Drive
+              </>
+            )}
           </Button>
         </div>
 

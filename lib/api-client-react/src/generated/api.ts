@@ -38,6 +38,7 @@ import type {
   SearchFeedbackBody,
   SearchResults,
   SuccessResponse,
+  SyncAllFoldersResult,
   SyncRequest,
   SyncResponse,
   SyncedFolder,
@@ -1524,89 +1525,171 @@ export const useRemoveFolder = <
 };
 
 /**
- * @summary Submit thumbs up/down feedback on a search result
- */
-export const getSubmitSearchFeedbackUrl = () => {
-  return `/api/search/feedback`;
-};
-
-export const submitSearchFeedback = async (
-  searchFeedbackBody: SearchFeedbackBody,
-  options?: RequestInit,
-): Promise<SuccessResponse> => {
-  return customFetch<SuccessResponse>(getSubmitSearchFeedbackUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(searchFeedbackBody),
-  });
-};
-
-export const getSubmitSearchFeedbackMutationOptions = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof submitSearchFeedback>>,
-    TError,
-    { data: BodyType<SearchFeedbackBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof submitSearchFeedback>>,
-  TError,
-  { data: BodyType<SearchFeedbackBody> },
-  TContext
-> => {
-  const mutationKey = ["submitSearchFeedback"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof submitSearchFeedback>>,
-    { data: BodyType<SearchFeedbackBody> }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return submitSearchFeedback(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type SubmitSearchFeedbackMutationResult = NonNullable<
-  Awaited<ReturnType<typeof submitSearchFeedback>>
->;
-export type SubmitSearchFeedbackMutationBody = BodyType<SearchFeedbackBody>;
-export type SubmitSearchFeedbackMutationError = ErrorType<unknown>;
-
-/**
- * @summary Submit thumbs up/down feedback on a search result
- */
-export const useSubmitSearchFeedback = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof submitSearchFeedback>>,
-    TError,
-    { data: BodyType<SearchFeedbackBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof submitSearchFeedback>>,
-  TError,
-  { data: BodyType<SearchFeedbackBody> },
-  TContext
-> => {
-  return useMutation(getSubmitSearchFeedbackMutationOptions(options));
+/** 
+ * @summary Submit thumbs up/down feedback on a search result 
+ */ 
+export const getSubmitSearchFeedbackUrl = () => { 
+  return `/api/search/feedback`; 
+}; 
+ 
+export const submitSearchFeedback = async ( 
+  searchFeedbackBody: SearchFeedbackBody, 
+  options?: RequestInit, 
+): Promise<SuccessResponse> => { 
+  return customFetch<SuccessResponse>(getSubmitSearchFeedbackUrl(), { 
+    ...options, 
+    method: "POST", 
+    headers: { "Content-Type": "application/json", ...options?.headers }, 
+    body: JSON.stringify(searchFeedbackBody), 
+  }); 
+}; 
+ 
+/** 
+ * @summary Re-scan all tracked Google Drive folders for new clips 
+ */ 
+export const getSyncAllFoldersUrl = () => { 
+  return `/api/folders/sync-all`; 
+}; 
+ 
+export const syncAllFolders = async ( 
+  options?: RequestInit, 
+): Promise<SyncAllFoldersResult> => { 
+  return customFetch<SyncAllFoldersResult>(getSyncAllFoldersUrl(), { 
+    ...options, 
+    method: "POST", 
+  }); 
+}; 
+ 
+export const getSubmitSearchFeedbackMutationOptions = < 
+  TError = ErrorType<unknown>, 
+  TContext = unknown, 
+>(options?: { 
+  mutation?: UseMutationOptions< 
+    Awaited<ReturnType<typeof submitSearchFeedback>>, 
+    TError, 
+    { data: BodyType<SearchFeedbackBody> }, 
+    TContext 
+  >; 
+  request?: SecondParameter<typeof customFetch>; 
+}): UseMutationOptions< 
+  Awaited<ReturnType<typeof submitSearchFeedback>>, 
+  TError, 
+  { data: BodyType<SearchFeedbackBody> }, 
+  TContext 
+> => { 
+  const mutationKey = ["submitSearchFeedback"]; 
+  const { mutation: mutationOptions, request: requestOptions } = options 
+    ? options.mutation && 
+      "mutationKey" in options.mutation && 
+      options.mutation.mutationKey 
+      ? options 
+      : { ...options, mutation: { ...options.mutation, mutationKey } } 
+    : { mutation: { mutationKey }, request: undefined }; 
+ 
+  const mutationFn: MutationFunction< 
+    Awaited<ReturnType<typeof submitSearchFeedback>>, 
+    { data: BodyType<SearchFeedbackBody> } 
+  > = (props) => { 
+    const { data } = props ?? {}; 
+ 
+    return submitSearchFeedback(data, requestOptions); 
+  }; 
+ 
+  return { mutationFn, ...mutationOptions }; 
+}; 
+ 
+export const getSyncAllFoldersMutationOptions = < 
+  TError = ErrorType<unknown>, 
+  TContext = unknown, 
+>(options?: { 
+  mutation?: UseMutationOptions< 
+    Awaited<ReturnType<typeof syncAllFolders>>, 
+    TError, 
+    void, 
+    TContext 
+  >; 
+  request?: SecondParameter<typeof customFetch>; 
+}): UseMutationOptions< 
+  Awaited<ReturnType<typeof syncAllFolders>>, 
+  TError, 
+  void, 
+  TContext 
+> => { 
+  const mutationKey = ["syncAllFolders"]; 
+  const { mutation: mutationOptions, request: requestOptions } = options 
+    ? options.mutation && 
+      "mutationKey" in options.mutation && 
+      options.mutation.mutationKey 
+      ? options 
+      : { ...options, mutation: { ...options.mutation, mutationKey } } 
+    : { mutation: { mutationKey }, request: undefined }; 
+ 
+  const mutationFn: MutationFunction< 
+    Awaited<ReturnType<typeof syncAllFolders>>, 
+    void 
+  > = () => { 
+    return syncAllFolders(requestOptions); 
+  }; 
+ 
+  return { mutationFn, ...mutationOptions }; 
+}; 
+ 
+export type SubmitSearchFeedbackMutationResult = NonNullable< 
+  Awaited<ReturnType<typeof submitSearchFeedback>> 
+>; 
+export type SubmitSearchFeedbackMutationBody = BodyType<SearchFeedbackBody>; 
+export type SubmitSearchFeedbackMutationError = ErrorType<unknown>; 
+ 
+export type SyncAllFoldersMutationResult = NonNullable< 
+  Awaited<ReturnType<typeof syncAllFolders>> 
+>; 
+ 
+export type SyncAllFoldersMutationError = ErrorType<unknown>; 
+ 
+/** 
+ * @summary Submit thumbs up/down feedback on a search result 
+ */ 
+export const useSubmitSearchFeedback = < 
+  TError = ErrorType<unknown>, 
+  TContext = unknown, 
+>(options?: { 
+  mutation?: UseMutationOptions< 
+    Awaited<ReturnType<typeof submitSearchFeedback>>, 
+    TError, 
+    { data: BodyType<SearchFeedbackBody> }, 
+    TContext 
+  >; 
+  request?: SecondParameter<typeof customFetch>; 
+}): UseMutationResult< 
+  Awaited<ReturnType<typeof submitSearchFeedback>>, 
+  TError, 
+  { data: BodyType<SearchFeedbackBody> }, 
+  TContext 
+> => { 
+  return useMutation(getSubmitSearchFeedbackMutationOptions(options)); 
+}; 
+ 
+/** 
+ * @summary Re-scan all tracked Google Drive folders for new clips 
+ */ 
+export const useSyncAllFolders = < 
+  TError = ErrorType<unknown>, 
+  TContext = unknown, 
+>(options?: { 
+  mutation?: UseMutationOptions< 
+    Awaited<ReturnType<typeof syncAllFolders>>, 
+    TError, 
+    void, 
+    TContext 
+  >; 
+  request?: SecondParameter<typeof customFetch>; 
+}): UseMutationResult< 
+  Awaited<ReturnType<typeof syncAllFolders>>, 
+  TError, 
+  void, 
+  TContext 
+> => { 
+  return useMutation(getSyncAllFoldersMutationOptions(options)); 
 };
 
 /**

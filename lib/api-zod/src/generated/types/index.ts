@@ -33,6 +33,7 @@ export * from "./searchResult";
 export * from "./searchResults";
 export * from "./searchResultType";
 export * from "./successResponse";
+export * from "./syncAllFoldersResult";
 export * from "./syncedFolder";
 export * from "./syncRequest";
 export * from "./syncResponse";

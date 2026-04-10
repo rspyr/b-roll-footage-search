@@ -396,6 +396,15 @@ export const GetAnnotationStatusResponse = zod.record(
 );
 
 /**
+ * @summary Re-scan all tracked Google Drive folders for new clips
+ */
+export const SyncAllFoldersResponse = zod.object({
+  newVideoCount: zod.number(),
+  folderCount: zod.number(),
+  message: zod.string(),
+});
+
+/**
  * @summary Re-sync a folder to find new videos from Google Drive
  */
 export const ResyncFolderParams = zod.object({

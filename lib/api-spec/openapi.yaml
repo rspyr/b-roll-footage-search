@@ -394,6 +394,19 @@ paths:
         "404":
           description: Folder not found
 
+  /folders/sync-all:
+    post:
+      operationId: syncAllFolders
+      tags: [folders]
+      summary: Re-scan all tracked Google Drive folders for new clips
+      responses:
+        "200":
+          description: Sync results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncAllFoldersResult"
+
   /search/feedback:
     post:
       operationId: submitSearchFeedback
@@ -858,6 +871,20 @@ components:
         - newVideoCount
         - totalInDrive
         - videos
+
+    SyncAllFoldersResult:
+      type: object
+      properties:
+        newVideoCount:
+          type: integer
+        folderCount:
+          type: integer
+        message:
+          type: string
+      required:
+        - newVideoCount
+        - folderCount
+        - message
 
     SearchFeedbackBody:
       type: object

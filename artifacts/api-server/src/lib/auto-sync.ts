@@ -8,16 +8,16 @@ const SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 let lastSyncTimestamp = 0;
 let syncInProgress = false;
 
-export async function syncAllFolders(): Promise<void> {
+export async function syncAllFolders(): Promise<{ newVideoCount: number; folderCount: number; skipped?: boolean }> {
   const now = Date.now();
   if (now - lastSyncTimestamp < SYNC_COOLDOWN_MS) {
     logger.info({ lastSyncAgo: Math.round((now - lastSyncTimestamp) / 1000) }, "Skipping auto-sync, ran recently");
-    return;
+    return { newVideoCount: 0, folderCount: 0, skipped: true };
   }
 
   if (syncInProgress) {
     logger.info("Skipping auto-sync, already in progress");
-    return;
+    return { newVideoCount: 0, folderCount: 0, skipped: true };
   }
 
   syncInProgress = true;
@@ -34,7 +34,7 @@ export async function syncAllFolders(): Promise<void> {
     if (folderIds.length === 0) {
       logger.info("Auto-sync: no folders to sync");
       lastSyncTimestamp = Date.now();
-      return;
+      return { newVideoCount: 0, folderCount: 0 };
     }
 
     logger.info({ folderCount: folderIds.length }, "Auto-sync: checking folders for new files");
@@ -77,6 +77,8 @@ export async function syncAllFolders(): Promise<void> {
     }
 
     lastSyncTimestamp = Date.now();
+
+    return { newVideoCount: totalNew, folderCount: folderIds.length };
   } finally {
     syncInProgress = false;
   }

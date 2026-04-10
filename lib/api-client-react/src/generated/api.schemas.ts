@@ -214,6 +214,12 @@ export interface AddAnnotationBody {
   content: string;
 }
 
+export interface SyncAllFoldersResult {
+  newVideoCount: number;
+  folderCount: number;
+  message: string;
+}
+
 export interface UpdateFrameBody {
   description: string;
 }
