@@ -416,17 +416,19 @@ function SearchResults({
           return (
           <div 
             key={i} 
-            className="flex flex-col rounded-lg border border-border bg-card overflow-hidden cursor-pointer hover:border-primary/50 transition-colors shadow-sm"
-            onClick={() => {
-              if (result.driveFileId) {
-                window.open(`https://drive.google.com/file/d/${result.driveFileId}/view`, '_blank', 'noopener,noreferrer');
-              } else {
-                const searchUrl = "/search" + (searchString.startsWith("?") ? searchString : `?${searchString}`);
-                onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}&from=${encodeURIComponent(searchUrl)}`);
-              }
-            }}
+            className="flex flex-col rounded-lg border border-border bg-card overflow-hidden hover:border-primary/50 transition-colors shadow-sm"
           >
-            <div className="aspect-video bg-muted relative">
+            <div
+              className="aspect-video bg-muted relative cursor-pointer"
+              onClick={() => {
+                if (result.driveFileId) {
+                  window.open(`https://drive.google.com/file/d/${result.driveFileId}/view`, '_blank', 'noopener,noreferrer');
+                } else {
+                  const searchUrl = "/search" + (searchString.startsWith("?") ? searchString : `?${searchString}`);
+                  onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}&from=${encodeURIComponent(searchUrl)}`);
+                }
+              }}
+            >
               <HoverScrubThumbnail
                 imagePath={result.imagePath}
                 allFramePaths={result.allFramePaths}
