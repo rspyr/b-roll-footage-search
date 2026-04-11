@@ -240,6 +240,17 @@ function AnnotationPanel({
           onChange={(e) => setNoteText(e.target.value)}
           placeholder="Add a note to improve search..."
           className="text-xs min-h-[56px] flex-1 resize-none"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              onClose();
+            } else if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (noteText.trim() && !addMutation.isPending) {
+                addMutation.mutate({ id: videoId, data: { content: noteText.trim() } });
+              }
+            }
+          }}
         />
         <Button
           size="sm"
