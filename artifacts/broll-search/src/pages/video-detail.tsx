@@ -108,6 +108,7 @@ export default function VideoDetail() {
 
   const frameScrollRef = useRef<HTMLDivElement>(null);
   const transcriptionScrollRef = useRef<HTMLDivElement>(null);
+  const notesTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [editingFrameId, setEditingFrameId] = useState<number | null>(null);
   const [editingFrameText, setEditingFrameText] = useState("");
@@ -987,7 +988,10 @@ export default function VideoDetail() {
 
       <div className="max-w-7xl mx-auto w-full px-4 pb-4">
         <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="p-3 border-b border-border bg-muted/30 font-medium flex items-center gap-2">
+          <div
+            className="p-3 border-b border-border bg-muted/30 font-medium flex items-center gap-2 cursor-pointer"
+            onClick={() => notesTextareaRef.current?.focus()}
+          >
             <MessageSquare size={16} />
             <span>Search Notes</span>
             {annotations && annotations.length > 0 && (
@@ -1013,6 +1017,7 @@ export default function VideoDetail() {
             )}
             <div className="flex gap-2">
               <Textarea
+                ref={notesTextareaRef}
                 value={newAnnotation}
                 onChange={(e) => setNewAnnotation(e.target.value)}
                 placeholder="Add a note (e.g. 'good for nature scenes', 'not useful for interviews')..."
