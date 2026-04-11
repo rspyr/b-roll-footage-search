@@ -560,7 +560,7 @@ export default function VideoDetail() {
                     );
                     if (suggestions.length === 0) return null;
                     return (
-                      <div className="absolute left-0 right-12 top-8 z-50 bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                      <div className="absolute left-0 right-12 top-8 z-[9999] bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
                         {suggestions.slice(0, 10).map((suggestion: string) => (
                           <button
                             key={suggestion}
