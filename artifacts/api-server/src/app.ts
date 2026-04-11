@@ -98,9 +98,16 @@ app.get("/api/frames/{*path}", requireAuth, async (req, res): Promise<void> => {
   if (result) {
     res.set("Content-Type", result.contentType);
     res.set("Cache-Control", "private, max-age=86400");
+    result.stream.on("error", () => {
+      if (!res.headersSent) {
+        res.status(500).send("Error streaming frame");
+      } else {
+        res.destroy();
+      }
+    });
     try {
       await pipeline(result.stream, res);
-    } catch (err) {
+    } catch {
       if (!res.headersSent) {
         res.status(500).send("Error streaming frame");
       }

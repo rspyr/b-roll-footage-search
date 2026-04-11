@@ -271,6 +271,15 @@ async function propagateTagsViaEmbeddings(poolClient: any) {
   logger.info({ enriched, total: videosWithTags.length }, "Tag propagation complete");
 }
 
+process.on("uncaughtException", (err) => {
+  if (err && (err as any).code === "ERR_STREAM_UNABLE_TO_PIPE") {
+    logger.warn("Suppressed ERR_STREAM_UNABLE_TO_PIPE (client disconnected during stream)");
+    return;
+  }
+  logger.fatal({ err }, "Uncaught exception — exiting");
+  process.exit(1);
+});
+
 async function start() {
   await ensureSessionTable();
   await ensureVideoSegmentsTable();
