@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { formatDuration } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSidebar } from "@/components/layout";
 
 const CARD_SIZE_KEY = "broll-search-card-size";
 const DEFAULT_CARD_SIZE = 0;
@@ -577,6 +578,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState(q);
   const [type, setType] = useState<"all" | "visual" | "audio">(typeParam);
   const [cardSize, setCardSize] = useCardSize();
+  const { collapse } = useSidebar();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
@@ -628,6 +630,7 @@ export default function SearchPage() {
     e.preventDefault();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     updateUrl(query, type);
+    collapse();
   };
 
   const handleTypeChange = (newType: string) => {
@@ -649,7 +652,7 @@ export default function SearchPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-border bg-card p-4 shrink-0">
+      <div className="border-b border-border bg-card px-4 h-14 flex items-center shrink-0">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-start md:items-center gap-4">
           <form onSubmit={handleSearch} className="flex-1 relative flex items-center w-full">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
