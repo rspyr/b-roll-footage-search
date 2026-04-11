@@ -80,6 +80,5 @@ ALTER TABLE "video_annotations" ADD CONSTRAINT "video_annotations_video_id_video
 CREATE INDEX "frames_video_id_idx" ON "frames" USING btree ("video_id");--> statement-breakpoint
 CREATE INDEX "transcriptions_video_id_idx" ON "transcriptions" USING btree ("video_id");--> statement-breakpoint
 CREATE INDEX "video_segments_video_id_idx" ON "video_segments" USING btree ("video_id");--> statement-breakpoint
-CREATE INDEX "video_segments_embedding_idx" ON "video_segments" USING hnsw ("embedding" vector_cosine_ops);--> statement-breakpoint
 CREATE INDEX "search_feedback_video_id_idx" ON "search_feedback" USING btree ("video_id");--> statement-breakpoint
 CREATE INDEX "video_annotations_video_id_idx" ON "video_annotations" USING btree ("video_id");

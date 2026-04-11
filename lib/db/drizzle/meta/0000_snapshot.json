@@ -1,5 +1,5 @@
 {
-  "id": "7ded9885-dfd4-43bd-8e8b-ed91e6c0fc7a",
+  "id": "60159136-0d0e-4701-9ca2-63396e23874c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -387,21 +387,6 @@
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
-          "with": {}
-        },
-        "video_segments_embedding_idx": {
-          "name": "video_segments_embedding_idx",
-          "columns": [
-            {
-              "expression": "\"embedding\" vector_cosine_ops",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "hnsw",
           "with": {}
         }
       },

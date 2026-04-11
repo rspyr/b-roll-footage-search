@@ -1,5 +1,4 @@
 import { pgTable, serial, timestamp, integer, real, index, customType } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { videosTable } from "./videos";
@@ -29,10 +28,6 @@ export const videoSegmentsTable = pgTable("video_segments", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("video_segments_video_id_idx").on(table.videoId),
-  index("video_segments_embedding_idx").using(
-    "hnsw",
-    sql`${table.embedding} vector_cosine_ops`
-  ),
 ]);
 
 export const insertVideoSegmentSchema = createInsertSchema(videoSegmentsTable).omit({ id: true, createdAt: true });
