@@ -414,8 +414,8 @@ export default function VideoDetail() {
       </div>
 
       <div className="max-w-7xl mx-auto w-full px-4 pt-4">
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="p-3 border-b border-border bg-muted/30 font-medium flex items-center gap-2">
+        <div className="bg-card rounded-lg border border-border overflow-visible">
+          <div className="p-3 border-b border-border bg-muted/30 font-medium flex items-center gap-2 rounded-t-lg">
             <Tag size={16} />
             <span>Tags</span>
             {!editingTags && (
