@@ -13,7 +13,7 @@ import {
   getGetAnnotationStatusQueryKey,
 } from "@workspace/api-client-react";
 import type { AnnotationItem, GetAnnotationStatus200 } from "@workspace/api-client-react";
-import { Search as SearchIcon, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag, Pencil, Trash2 } from "lucide-react";
+import { Search as SearchIcon, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag, Pencil, Trash2, ImageIcon, Mic } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
