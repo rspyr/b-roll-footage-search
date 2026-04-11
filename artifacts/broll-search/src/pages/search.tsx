@@ -13,7 +13,7 @@ import {
   getGetAnnotationStatusQueryKey,
 } from "@workspace/api-client-react";
 import type { AnnotationItem, GetAnnotationStatus200 } from "@workspace/api-client-react";
-import { Search as SearchIcon, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag, Pencil, Trash2, ImageIcon, Mic } from "lucide-react";
+import { Search as SearchIcon, Loader2, Sparkles, Link as LinkIcon, Check, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag, Pencil, Trash2, ImageIcon, Mic } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -395,7 +395,7 @@ function SearchResults({
   const t = cardSize / 100;
   const minColWidth = Math.round(420 - t * 270);
   const gap = Math.round(24 - t * 12);
-  const iconSize = Math.max(10, Math.round(14 * config.scale));
+
 
   return (
     <>
@@ -514,16 +514,12 @@ function SearchResults({
                 {result.videoTitle}
               </h3>
               <p
-                className="text-muted-foreground flex-1 italic"
+                className="text-muted-foreground italic"
                 style={{
                   fontSize: `${Math.max(11, Math.round(14 * config.fontSize))}px`,
-                  display: "-webkit-box",
-                  WebkitLineClamp: config.lineClamp,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
                 }}
               >
-                &ldquo;{result.content}&rdquo;
+                {result.content}
               </p>
 
               {result.videoTags && (
@@ -557,16 +553,6 @@ function SearchResults({
               
               <div style={{ marginTop: `${Math.round(12 * config.padding)}px` }}>
                 <RelevanceBar rank={result.rank} maxRank={maxRank} />
-              </div>
-              
-              <div
-                className="flex items-center font-medium text-muted-foreground group"
-                style={{
-                  marginTop: `${Math.round(12 * config.padding)}px`,
-                  fontSize: `${Math.max(10, Math.round(12 * config.fontSize))}px`,
-                }}
-              >
-                View details <ArrowRight size={iconSize} className="ml-1 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
 
