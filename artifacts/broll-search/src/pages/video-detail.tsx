@@ -17,6 +17,8 @@ import {
   useUpdateVideoTags,
   useListAllTags,
   getListAllTagsQueryKey,
+  useUpdateAnnotation,
+  useDeleteAnnotation,
 } from "@workspace/api-client-react";
 import type { AnnotationItem } from "@workspace/api-client-react";
 import {
@@ -31,6 +33,7 @@ import {
   Check,
   X,
   Plus,
+  Trash2,
   RefreshCw,
   MessageSquare,
   Send,
@@ -235,20 +238,49 @@ export default function VideoDetail() {
     query: { enabled: !!id, queryKey: getGetVideoAnnotationsQueryKey(id) },
   });
 
+  const [editingAnnotationId, setEditingAnnotationId] = useState<number | null>(null);
+  const [editAnnotationText, setEditAnnotationText] = useState("");
+
+  const invalidateAnnotations = () => {
+    queryClient.invalidateQueries({ queryKey: getGetVideoAnnotationsQueryKey(id) });
+    invalidateVideo();
+  };
+
   const addAnnotationMutation = useAddVideoAnnotation({
     mutation: {
       onSuccess: () => {
         toast({ title: "Note Added" });
         setNewAnnotation("");
-        queryClient.invalidateQueries({ queryKey: getGetVideoAnnotationsQueryKey(id) });
-        invalidateVideo();
+        invalidateAnnotations();
       },
       onError: () => {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to add note.",
-        });
+        toast({ variant: "destructive", title: "Error", description: "Failed to add note." });
+      },
+    },
+  });
+
+  const updateAnnotationMutation = useUpdateAnnotation({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Note Updated" });
+        setEditingAnnotationId(null);
+        setEditAnnotationText("");
+        invalidateAnnotations();
+      },
+      onError: () => {
+        toast({ variant: "destructive", title: "Error", description: "Failed to update note." });
+      },
+    },
+  });
+
+  const deleteAnnotationMutation = useDeleteAnnotation({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Note Deleted" });
+        invalidateAnnotations();
+      },
+      onError: () => {
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete note." });
       },
     },
   });
@@ -1002,11 +1034,64 @@ export default function VideoDetail() {
             {annotations && annotations.length > 0 ? (
               <div className="space-y-2">
                 {annotations.map((a: AnnotationItem) => (
-                  <div key={a.id} className="text-sm text-foreground bg-muted/50 rounded-md px-3 py-2 border border-border/50">
-                    {a.content}
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {formatDate(a.createdAt)}
-                    </div>
+                  <div key={a.id} className="text-sm text-foreground bg-muted/50 rounded-md px-3 py-2 border border-border/50 group">
+                    {editingAnnotationId === a.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editAnnotationText}
+                          onChange={(e) => setEditAnnotationText(e.target.value)}
+                          className="text-sm min-h-[50px] resize-none"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (editAnnotationText.trim()) {
+                                updateAnnotationMutation.mutate({ annotationId: a.id, data: { content: editAnnotationText.trim() } });
+                              }
+                            } else if (e.key === "Escape") {
+                              setEditingAnnotationId(null);
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <div className="flex gap-1">
+                          <Button size="sm" className="h-6 text-xs"
+                            disabled={!editAnnotationText.trim() || updateAnnotationMutation.isPending}
+                            onClick={() => updateAnnotationMutation.mutate({ annotationId: a.id, data: { content: editAnnotationText.trim() } })}
+                          >
+                            {updateAnnotationMutation.isPending ? <Loader2 size={10} className="animate-spin mr-1" /> : <Check size={10} className="mr-1" />}
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingAnnotationId(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          {a.content}
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {formatDate(a.createdAt)}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                          <button
+                            className="p-1 rounded hover:bg-muted transition-colors"
+                            title="Edit note"
+                            onClick={() => { setEditingAnnotationId(a.id); setEditAnnotationText(a.content); }}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            className="p-1 rounded hover:bg-destructive/20 text-destructive transition-colors"
+                            title="Delete note"
+                            onClick={() => deleteAnnotationMutation.mutate({ annotationId: a.id })}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

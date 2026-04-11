@@ -416,6 +416,36 @@ export const AddVideoAnnotationBody = zod.object({
 });
 
 /**
+ * @summary Update an annotation's content
+ */
+export const UpdateAnnotationParams = zod.object({
+  annotationId: zod.coerce.number(),
+});
+
+export const UpdateAnnotationBody = zod.object({
+  content: zod.string(),
+});
+
+export const UpdateAnnotationResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  videoId: zod.number(),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete an annotation
+ */
+export const DeleteAnnotationParams = zod.object({
+  annotationId: zod.coerce.number(),
+});
+
+export const DeleteAnnotationResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
  * @summary Check which videos have annotations
  */
 export const GetAnnotationStatusQueryParams = zod.object({

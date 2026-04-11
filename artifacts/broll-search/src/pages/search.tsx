@@ -7,11 +7,13 @@ import {
   useGetAnnotationStatus,
   useGetVideoAnnotations,
   useAddVideoAnnotation,
+  useUpdateAnnotation,
+  useDeleteAnnotation,
   getGetVideoAnnotationsQueryKey,
   getGetAnnotationStatusQueryKey,
 } from "@workspace/api-client-react";
 import type { AnnotationItem, GetAnnotationStatus200 } from "@workspace/api-client-react";
-import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag } from "lucide-react";
+import { Search as SearchIcon, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -185,12 +187,21 @@ function AnnotationPanel({
   onClose: () => void;
 }) {
   const [noteText, setNoteText] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     setTimeout(() => noteInputRef.current?.focus(), 50);
   }, []);
+
+  const invalidateAnnotations = () => {
+    queryClient.invalidateQueries({ queryKey: getGetVideoAnnotationsQueryKey(videoId) });
+    queryClient.invalidateQueries({ queryKey: getGetAnnotationStatusQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getSearchContentQueryKey() });
+  };
+
   const { data: annotations, isLoading } = useGetVideoAnnotations(videoId, {
     query: { queryKey: getGetVideoAnnotationsQueryKey(videoId) },
   });
@@ -199,8 +210,25 @@ function AnnotationPanel({
     mutation: {
       onSuccess: () => {
         setNoteText("");
-        queryClient.invalidateQueries({ queryKey: getGetVideoAnnotationsQueryKey(videoId) });
-        queryClient.invalidateQueries({ queryKey: getGetAnnotationStatusQueryKey() });
+        invalidateAnnotations();
+      },
+    },
+  });
+
+  const updateMutation = useUpdateAnnotation({
+    mutation: {
+      onSuccess: () => {
+        setEditingId(null);
+        setEditText("");
+        invalidateAnnotations();
+      },
+    },
+  });
+
+  const deleteMutation = useDeleteAnnotation({
+    mutation: {
+      onSuccess: () => {
+        invalidateAnnotations();
       },
     },
   });
@@ -224,8 +252,60 @@ function AnnotationPanel({
       ) : annotations && annotations.length > 0 ? (
         <div className="space-y-1.5 max-h-32 overflow-y-auto">
           {annotations.map((a: AnnotationItem) => (
-            <div key={a.id} className="text-xs text-foreground bg-background rounded px-2 py-1.5 border border-border/50">
-              {a.content}
+            <div key={a.id} className="text-xs text-foreground bg-background rounded px-2 py-1.5 border border-border/50 group">
+              {editingId === a.id ? (
+                <div className="space-y-1">
+                  <Textarea
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    className="text-xs min-h-[40px] resize-none"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (editText.trim()) {
+                          updateMutation.mutate({ annotationId: a.id, data: { content: editText.trim() } });
+                        }
+                      } else if (e.key === "Escape") {
+                        setEditingId(null);
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]"
+                      disabled={!editText.trim() || updateMutation.isPending}
+                      onClick={() => updateMutation.mutate({ annotationId: a.id, data: { content: editText.trim() } })}
+                    >
+                      {updateMutation.isPending ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />} Save
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]"
+                      onClick={() => setEditingId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-1">
+                  <span className="flex-1">{a.content}</span>
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <button
+                      className="p-0.5 rounded hover:bg-muted transition-colors"
+                      title="Edit note"
+                      onClick={() => { setEditingId(a.id); setEditText(a.content); }}
+                    >
+                      <Pencil size={10} />
+                    </button>
+                    <button
+                      className="p-0.5 rounded hover:bg-destructive/20 text-destructive transition-colors"
+                      title="Delete note"
+                      onClick={() => deleteMutation.mutate({ annotationId: a.id })}
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -316,7 +396,6 @@ function SearchResults({
   const minColWidth = Math.round(420 - t * 270);
   const gap = Math.round(24 - t * 12);
   const iconSize = Math.max(10, Math.round(14 * config.scale));
-  const badgeIconSize = Math.max(9, Math.round(12 * config.scale));
 
   return (
     <>
@@ -421,19 +500,8 @@ function SearchResults({
                   className="p-1.5 rounded-md bg-black/60 hover:bg-black/80 text-white transition-colors"
                   title="View details"
                 >
-                  <Info size={iconSize} />
+                  <Info size={14} />
                 </button>
-                <span
-                  className={`rounded font-medium flex items-center gap-1 shadow-sm
-                    ${result.type === 'frame' ? 'bg-blue-500/90 text-white' : 'bg-purple-500/90 text-white'}`}
-                  style={{
-                    fontSize: `${Math.max(9, Math.round(12 * config.fontSize))}px`,
-                    padding: `${Math.round(4 * config.padding)}px ${Math.round(8 * config.padding)}px`,
-                  }}
-                >
-                  {result.type === 'frame' ? <ImageIcon size={badgeIconSize}/> : <Mic size={badgeIconSize}/>}
-                  {result.type === 'frame' ? 'Visual' : 'Audio'}
-                </span>
               </div>
             </div>
             

@@ -514,6 +514,52 @@ paths:
         "404":
           description: Video not found
 
+  /annotations/{annotationId}:
+    patch:
+      operationId: updateAnnotation
+      tags: [videos]
+      summary: Update an annotation's content
+      parameters:
+        - name: annotationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAnnotationBody"
+      responses:
+        "200":
+          description: Annotation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnotationItem"
+        "404":
+          description: Annotation not found
+    delete:
+      operationId: deleteAnnotation
+      tags: [videos]
+      summary: Delete an annotation
+      parameters:
+        - name: annotationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Annotation deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Annotation not found
+
   /annotations/status:
     get:
       operationId: getAnnotationStatus

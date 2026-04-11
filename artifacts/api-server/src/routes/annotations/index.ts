@@ -74,33 +74,7 @@ router.post("/videos/:id/annotations", async (req, res): Promise<void> => {
     }
 
     try {
-      const allAnnotations = await db
-        .select({ content: videoAnnotationsTable.content })
-        .from(videoAnnotationsTable)
-        .where(eq(videoAnnotationsTable.videoId, videoId));
-      const combinedText = allAnnotations.map(a => a.content).join(". ");
-
-      const embedResult = await gemini.models.embedContent({
-        model: "gemini-embedding-2-preview",
-        contents: combinedText,
-        config: { outputDimensionality: 768 },
-      });
-      const embedding = embedResult.embeddings?.[0]?.values;
-      if (embedding) {
-        const [v] = await db.select({ duration: videosTable.duration }).from(videosTable).where(eq(videosTable.id, videoId)).limit(1);
-        const dur = v?.duration ?? 0;
-
-        await db.delete(videoSegmentsTable).where(
-          sql`${videoSegmentsTable.videoId} = ${videoId} AND ${videoSegmentsTable.startSec} = -1`
-        );
-        await db.insert(videoSegmentsTable).values({
-          videoId,
-          startSec: -1,
-          endSec: dur,
-          embedding,
-        });
-        logger.info({ videoId }, "Embedded annotation text for vector search");
-      }
+      await reEmbedAnnotations(videoId);
     } catch (err) {
       logger.warn({ err, videoId }, "Failed to embed annotation text (non-fatal)");
     }
@@ -130,6 +104,122 @@ router.get("/videos/:id/annotations", async (req, res): Promise<void> => {
   } catch (err) {
     logger.error({ err, videoId }, "Failed to fetch annotations");
     res.status(500).json({ error: "Failed to fetch annotations" });
+  }
+});
+
+async function reEmbedAnnotations(videoId: number): Promise<void> {
+  const allAnnotations = await db
+    .select({ content: videoAnnotationsTable.content })
+    .from(videoAnnotationsTable)
+    .where(eq(videoAnnotationsTable.videoId, videoId));
+
+  if (allAnnotations.length === 0) {
+    await db.delete(videoSegmentsTable).where(
+      sql`${videoSegmentsTable.videoId} = ${videoId} AND ${videoSegmentsTable.startSec} = -1`
+    );
+    logger.info({ videoId }, "Removed annotation embedding (no annotations left)");
+    return;
+  }
+
+  const combinedText = allAnnotations.map(a => a.content).join(". ");
+  const embedResult = await gemini.models.embedContent({
+    model: "gemini-embedding-2-preview",
+    contents: combinedText,
+    config: { outputDimensionality: 768 },
+  });
+  const embedding = embedResult.embeddings?.[0]?.values;
+  if (embedding) {
+    const [v] = await db.select({ duration: videosTable.duration }).from(videosTable).where(eq(videosTable.id, videoId)).limit(1);
+    const dur = v?.duration ?? 0;
+    await db.delete(videoSegmentsTable).where(
+      sql`${videoSegmentsTable.videoId} = ${videoId} AND ${videoSegmentsTable.startSec} = -1`
+    );
+    await db.insert(videoSegmentsTable).values({
+      videoId,
+      startSec: -1,
+      endSec: dur,
+      embedding,
+    });
+    logger.info({ videoId }, "Re-embedded annotation text for vector search");
+  }
+}
+
+router.patch("/annotations/:annotationId", async (req, res): Promise<void> => {
+  const annotationId = parseInt(req.params.annotationId);
+  if (isNaN(annotationId)) {
+    res.status(400).json({ error: "Invalid annotation ID" });
+    return;
+  }
+
+  const { content } = req.body;
+  if (!content || typeof content !== "string" || !content.trim()) {
+    res.status(400).json({ error: "content is required" });
+    return;
+  }
+
+  try {
+    const [existing] = await db.select().from(videoAnnotationsTable).where(eq(videoAnnotationsTable.id, annotationId)).limit(1);
+    if (!existing) {
+      res.status(404).json({ error: "Annotation not found" });
+      return;
+    }
+
+    const [updated] = await db.update(videoAnnotationsTable)
+      .set({ content: content.trim() })
+      .where(eq(videoAnnotationsTable.id, annotationId))
+      .returning();
+
+    try {
+      await regenerateTagsForVideo(existing.videoId);
+    } catch (err) {
+      logger.warn({ err, videoId: existing.videoId }, "Failed to regenerate tags after annotation edit (non-fatal)");
+    }
+
+    try {
+      await reEmbedAnnotations(existing.videoId);
+    } catch (err) {
+      logger.warn({ err, videoId: existing.videoId }, "Failed to re-embed annotations after edit (non-fatal)");
+    }
+
+    res.json(updated);
+  } catch (err) {
+    logger.error({ err, annotationId }, "Failed to update annotation");
+    res.status(500).json({ error: "Failed to update annotation" });
+  }
+});
+
+router.delete("/annotations/:annotationId", async (req, res): Promise<void> => {
+  const annotationId = parseInt(req.params.annotationId);
+  if (isNaN(annotationId)) {
+    res.status(400).json({ error: "Invalid annotation ID" });
+    return;
+  }
+
+  try {
+    const [existing] = await db.select().from(videoAnnotationsTable).where(eq(videoAnnotationsTable.id, annotationId)).limit(1);
+    if (!existing) {
+      res.status(404).json({ error: "Annotation not found" });
+      return;
+    }
+
+    await db.delete(videoAnnotationsTable).where(eq(videoAnnotationsTable.id, annotationId));
+
+    try {
+      await regenerateTagsForVideo(existing.videoId);
+    } catch (err) {
+      logger.warn({ err, videoId: existing.videoId }, "Failed to regenerate tags after annotation delete (non-fatal)");
+    }
+
+    try {
+      await reEmbedAnnotations(existing.videoId);
+    } catch (err) {
+      logger.warn({ err, videoId: existing.videoId }, "Failed to re-embed annotations after delete (non-fatal)");
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err, annotationId }, "Failed to delete annotation");
+    res.status(500).json({ error: "Failed to delete annotation" });
   }
 });
 

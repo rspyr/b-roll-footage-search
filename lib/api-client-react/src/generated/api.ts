@@ -2027,6 +2027,177 @@ export const useAddVideoAnnotation = <
 };
 
 /**
+ * @summary Update an annotation's content
+ */
+export const getUpdateAnnotationUrl = (annotationId: number) => {
+  return `/api/annotations/${annotationId}`;
+};
+
+export const updateAnnotation = async (
+  annotationId: number,
+  addAnnotationBody: AddAnnotationBody,
+  options?: RequestInit,
+): Promise<AnnotationItem> => {
+  return customFetch<AnnotationItem>(getUpdateAnnotationUrl(annotationId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addAnnotationBody),
+  });
+};
+
+export const getUpdateAnnotationMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAnnotation>>,
+    TError,
+    { annotationId: number; data: BodyType<AddAnnotationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAnnotation>>,
+  TError,
+  { annotationId: number; data: BodyType<AddAnnotationBody> },
+  TContext
+> => {
+  const mutationKey = ["updateAnnotation"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAnnotation>>,
+    { annotationId: number; data: BodyType<AddAnnotationBody> }
+  > = (props) => {
+    const { annotationId, data } = props ?? {};
+
+    return updateAnnotation(annotationId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAnnotationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAnnotation>>
+>;
+export type UpdateAnnotationMutationBody = BodyType<AddAnnotationBody>;
+export type UpdateAnnotationMutationError = ErrorType<void>;
+
+/**
+ * @summary Update an annotation's content
+ */
+export const useUpdateAnnotation = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAnnotation>>,
+    TError,
+    { annotationId: number; data: BodyType<AddAnnotationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAnnotation>>,
+  TError,
+  { annotationId: number; data: BodyType<AddAnnotationBody> },
+  TContext
+> => {
+  return useMutation(getUpdateAnnotationMutationOptions(options));
+};
+
+/**
+ * @summary Delete an annotation
+ */
+export const getDeleteAnnotationUrl = (annotationId: number) => {
+  return `/api/annotations/${annotationId}`;
+};
+
+export const deleteAnnotation = async (
+  annotationId: number,
+  options?: RequestInit,
+): Promise<SuccessResponse> => {
+  return customFetch<SuccessResponse>(getDeleteAnnotationUrl(annotationId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteAnnotationMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAnnotation>>,
+    TError,
+    { annotationId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAnnotation>>,
+  TError,
+  { annotationId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteAnnotation"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAnnotation>>,
+    { annotationId: number }
+  > = (props) => {
+    const { annotationId } = props ?? {};
+
+    return deleteAnnotation(annotationId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteAnnotationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAnnotation>>
+>;
+
+export type DeleteAnnotationMutationError = ErrorType<void>;
+
+/**
+ * @summary Delete an annotation
+ */
+export const useDeleteAnnotation = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAnnotation>>,
+    TError,
+    { annotationId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteAnnotation>>,
+  TError,
+  { annotationId: number },
+  TContext
+> => {
+  return useMutation(getDeleteAnnotationMutationOptions(options));
+};
+
+/**
  * @summary Check which videos have annotations
  */
 export const getGetAnnotationStatusUrl = (
