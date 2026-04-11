@@ -13,7 +13,7 @@ import {
   getGetAnnotationStatusQueryKey,
 } from "@workspace/api-client-react";
 import type { AnnotationItem, GetAnnotationStatus200 } from "@workspace/api-client-react";
-import { Search as SearchIcon, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag, Pencil, Trash2, ImageIcon, Mic } from "lucide-react";
+import { Search as SearchIcon, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag, Pencil, Trash2, ImageIcon, Mic } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -487,30 +487,23 @@ function SearchResults({
                 </button>
               </div>
               
-              <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                {result.driveFileId && (
+              {result.driveFileId && (
+                <div className="absolute top-2 right-2 flex items-center gap-1.5">
                   <CopyDriveLinkButton driveFileId={result.driveFileId} />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const searchUrl = "/search" + (searchString.startsWith("?") ? searchString : `?${searchString}`);
-                    onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}&from=${encodeURIComponent(searchUrl)}`);
-                  }}
-                  className="p-1.5 rounded-md bg-black/60 hover:bg-black/80 text-white transition-colors"
-                  title="View details"
-                >
-                  <Info size={14} />
-                </button>
-              </div>
+                </div>
+              )}
             </div>
             
             <div
-              className="flex flex-col flex-1"
+              className="flex flex-col flex-1 cursor-pointer hover:bg-muted/30 transition-colors"
               style={{ padding: `${Math.round(16 * config.padding)}px` }}
+              onClick={() => {
+                const searchUrl = "/search" + (searchString.startsWith("?") ? searchString : `?${searchString}`);
+                onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}&from=${encodeURIComponent(searchUrl)}`);
+              }}
             >
               <h3
-                className="font-medium truncate text-primary hover:underline"
+                className="font-medium truncate text-primary"
                 style={{
                   fontSize: `${Math.max(11, Math.round(14 * config.fontSize))}px`,
                   marginBottom: `${Math.round(8 * config.padding)}px`,
@@ -565,15 +558,10 @@ function SearchResults({
               </div>
               
               <div
-                className="flex items-center font-medium text-muted-foreground hover:text-primary transition-colors group"
+                className="flex items-center font-medium text-muted-foreground group"
                 style={{
                   marginTop: `${Math.round(12 * config.padding)}px`,
                   fontSize: `${Math.max(10, Math.round(12 * config.fontSize))}px`,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const searchUrl = "/search" + (searchString.startsWith("?") ? searchString : `?${searchString}`);
-                  onNavigate(`/videos/${result.videoId}?t=${result.timestampSec}&from=${encodeURIComponent(searchUrl)}`);
                 }}
               >
                 View details <ArrowRight size={iconSize} className="ml-1 group-hover:translate-x-1 transition-transform" />
