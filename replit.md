@@ -87,11 +87,12 @@ A semantic video search application that connects to Google Drive, processes vid
 - **Vector search**: Original user query is embedded via `gemini-embedding-2-preview`, then matched against video segment embeddings using pgvector cosine similarity (`<=>` operator)
 - **Full-text search**: PostgreSQL `plainto_tsquery` with expanded query against frame descriptions, transcriptions, titles, and tags
 - **Fuzzy matching**: `pg_trgm` word_similarity matching on titles, frame descriptions, and tags
-- **Tag search**: AI-generated concept tags searched via FTS (2x boost) and fuzzy matching (1x)
+- **Tag search**: AI-generated concept tags searched via FTS (4x boost) and fuzzy matching (3x)
 - **Fusion**: Results from all sources combined using Reciprocal Rank Fusion (RRF), deduplicated by video, and ranked
 - **Annotation search**: User-submitted notes on videos are searched via FTS (5x boost — highest weight) and fuzzy matching (3x boost). Adding annotations also embeds them as vectors (stored as video_segments with startSec=-1) for semantic search.
 - **Feedback adjustment**: Thumbs up/down feedback applies proportional multipliers to RRF scores (each net downvote decays score by 30%; each net upvote boosts by 15%, clamped to 0.15–2.0x) using FTS similarity matching on stored queries
-- **RRF boosts**: Annotation FTS (5x), Annotation fuzzy (3x), Title FTS (3x), Title fuzzy (2x), Tag FTS (2x), Vector (1x), Frame FTS (1x), Transcription FTS (1x), Tag fuzzy (1x), Desc fuzzy (1x)
+- **RRF boosts**: Annotation FTS (5x), Annotation fuzzy (4x), Tag FTS (4x), Title FTS (3x), Tag fuzzy (3x), Vector (2x), Title fuzzy (2x), Transcription FTS (1x), Frame Desc FTS (0.5x), Frame Desc fuzzy (0.5x)
+- **GET /api/tags** — Returns all unique tags across all videos (used for tag autocomplete)
 - This means "game" can find "Rock Paper Scissors.mp4" because concept tags capture abstract relationships
 
 ### Frame Storage (Object Storage)

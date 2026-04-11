@@ -164,6 +164,21 @@ router.post("/videos/sync", syncRateLimit, async (req, res): Promise<void> => {
   });
 });
 
+router.get("/tags", async (_req, res): Promise<void> => {
+  const allVideos = await db.select({ tags: videosTable.tags }).from(videosTable);
+  const tagSet = new Set<string>();
+  for (const v of allVideos) {
+    if (v.tags) {
+      for (const t of v.tags.split(",")) {
+        const trimmed = t.trim().toLowerCase();
+        if (trimmed) tagSet.add(trimmed);
+      }
+    }
+  }
+  const sorted = [...tagSet].sort();
+  res.json(sorted);
+});
+
 router.patch("/videos/:id/tags", async (req, res): Promise<void> => {
   const videoId = parseInt(req.params.id);
   if (isNaN(videoId)) {

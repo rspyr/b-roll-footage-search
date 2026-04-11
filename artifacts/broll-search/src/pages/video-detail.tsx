@@ -15,6 +15,8 @@ import {
   useAddVideoAnnotation,
   getGetVideoAnnotationsQueryKey,
   useUpdateVideoTags,
+  useListAllTags,
+  getListAllTagsQueryKey,
 } from "@workspace/api-client-react";
 import type { AnnotationItem } from "@workspace/api-client-react";
 import {
@@ -256,6 +258,7 @@ export default function VideoDetail() {
         setEditingTags(false);
         setNewTag("");
         invalidateVideo();
+        queryClient.invalidateQueries({ queryKey: getListAllTagsQueryKey() });
       },
       onError: () => {
         toast({
@@ -266,6 +269,8 @@ export default function VideoDetail() {
       },
     },
   });
+
+  const { data: allTagsList } = useListAllTags();
 
   const nearestFrameTs = useMemo(() => {
     if (targetTs === null || !video) return null;
@@ -412,7 +417,7 @@ export default function VideoDetail() {
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="p-3 border-b border-border bg-muted/30 font-medium flex items-center gap-2">
             <Tag size={16} />
-            <span>AI Tags</span>
+            <span>Tags</span>
             {!editingTags && (
               <Button
                 variant="ghost"
@@ -423,7 +428,7 @@ export default function VideoDetail() {
                   setTagsText(video.tags || "");
                 }}
               >
-                <Pencil size={12} className="mr-1" /> Edit
+                <Pencil size={12} className="mr-1" /> Edit All
               </Button>
             )}
           </div>
@@ -466,48 +471,115 @@ export default function VideoDetail() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {video.tags ? (
-                  video.tags.split(",").map((tag: string, i: number) => (
-                    <Badge key={i} variant="secondary" className="text-xs font-normal">
-                      {tag.trim()}
-                    </Badge>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    No tags generated yet. Tags are created automatically during processing.
-                  </p>
-                )}
-              </div>
-            )}
-            {!editingTags && (
-              <div className="flex gap-2 mt-2">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Add a tag..."
-                  className="h-7 text-sm flex-1"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newTag.trim()) {
-                      const existing = video.tags || "";
-                      const updated = existing ? `${existing}, ${newTag.trim()}` : newTag.trim();
-                      updateTagsMutation.mutate({ id, data: { tags: updated } });
-                    }
-                  }}
-                />
-                <Button
-                  size="sm"
-                  className="h-7 text-xs"
-                  disabled={!newTag.trim() || updateTagsMutation.isPending}
-                  onClick={() => {
-                    const existing = video.tags || "";
-                    const updated = existing ? `${existing}, ${newTag.trim()}` : newTag.trim();
-                    updateTagsMutation.mutate({ id, data: { tags: updated } });
-                  }}
-                >
-                  <Plus size={12} className="mr-1" /> Add
-                </Button>
-              </div>
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {video.tags ? (
+                    video.tags.split(",").map((tag: string, i: number) => {
+                      const trimmed = tag.trim();
+                      if (!trimmed) return null;
+                      return (
+                        <Badge
+                          key={i}
+                          variant="secondary"
+                          className="text-xs font-normal pr-1 flex items-center gap-1 group"
+                        >
+                          {trimmed}
+                          <button
+                            className="ml-0.5 rounded-full hover:bg-destructive/20 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => {
+                              const tags = (video.tags || "")
+                                .split(",")
+                                .map((t: string) => t.trim().toLowerCase())
+                                .filter(Boolean);
+                              const updated = tags.filter((_: string, idx: number) => idx !== i).join(", ");
+                              updateTagsMutation.mutate({ id, data: { tags: updated } });
+                            }}
+                          >
+                            <X size={10} />
+                          </button>
+                        </Badge>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">
+                      No tags yet. Tags are created automatically during processing, or add your own below.
+                    </p>
+                  )}
+                </div>
+                <div className="relative mt-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      placeholder="Add a tag..."
+                      className="h-7 text-sm flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newTag.trim()) {
+                          const existing = video.tags || "";
+                          const trimmedNew = newTag.trim().toLowerCase();
+                          const currentTags = existing.split(",").map((t: string) => t.trim().toLowerCase()).filter(Boolean);
+                          if (currentTags.includes(trimmedNew)) {
+                            setNewTag("");
+                            return;
+                          }
+                          const updated = existing ? `${existing}, ${trimmedNew}` : trimmedNew;
+                          updateTagsMutation.mutate({ id, data: { tags: updated } });
+                        }
+                        if (e.key === "Escape") {
+                          setNewTag("");
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={!newTag.trim() || updateTagsMutation.isPending}
+                      onClick={() => {
+                        const existing = video.tags || "";
+                        const trimmedNew = newTag.trim().toLowerCase();
+                        const currentTags = existing.split(",").map((t: string) => t.trim().toLowerCase()).filter(Boolean);
+                        if (currentTags.includes(trimmedNew)) {
+                          setNewTag("");
+                          return;
+                        }
+                        const updated = existing ? `${existing}, ${trimmedNew}` : trimmedNew;
+                        updateTagsMutation.mutate({ id, data: { tags: updated } });
+                      }}
+                    >
+                      <Plus size={12} className="mr-1" /> Add
+                    </Button>
+                  </div>
+                  {newTag.trim().length > 0 && allTagsList && (() => {
+                    const currentTags = new Set(
+                      (video.tags || "").split(",").map((t: string) => t.trim().toLowerCase()).filter(Boolean)
+                    );
+                    const suggestions = allTagsList.filter(
+                      (t: string) =>
+                        t.includes(newTag.trim().toLowerCase()) &&
+                        !currentTags.has(t)
+                    );
+                    if (suggestions.length === 0) return null;
+                    return (
+                      <div className="absolute left-0 right-12 top-8 z-50 bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                        {suggestions.slice(0, 10).map((suggestion: string) => (
+                          <button
+                            key={suggestion}
+                            className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                            onClick={() => {
+                              const existing = video.tags || "";
+                              const updated = existing ? `${existing}, ${suggestion}` : suggestion;
+                              updateTagsMutation.mutate({ id, data: { tags: updated } });
+                              setNewTag("");
+                            }}
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </>
             )}
           </div>
         </div>

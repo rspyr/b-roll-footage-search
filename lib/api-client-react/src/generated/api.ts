@@ -315,6 +315,79 @@ export function useGetVideo<
 }
 
 /**
+ * @summary List all unique tags across all videos
+ */
+export const getListAllTagsUrl = () => {
+  return `/api/tags`;
+};
+
+export const listAllTags = async (options?: RequestInit): Promise<string[]> => {
+  return customFetch<string[]>(getListAllTagsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAllTagsQueryKey = () => {
+  return [`/api/tags`] as const;
+};
+
+export const getListAllTagsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAllTags>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAllTags>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAllTagsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllTags>>> = ({
+    signal,
+  }) => listAllTags({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAllTags>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAllTagsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAllTags>>
+>;
+export type ListAllTagsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all unique tags across all videos
+ */
+
+export function useListAllTags<
+  TData = Awaited<ReturnType<typeof listAllTags>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAllTags>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAllTagsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Update a video's tags
  */
 export const getUpdateVideoTagsUrl = (id: number) => {

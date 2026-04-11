@@ -77,6 +77,21 @@ paths:
         "404":
           description: Video not found
 
+  /tags:
+    get:
+      operationId: listAllTags
+      tags: [videos]
+      summary: List all unique tags across all videos
+      responses:
+        "200":
+          description: List of unique tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
   /videos/{id}/tags:
     patch:
       operationId: updateVideoTags

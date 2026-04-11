@@ -92,6 +92,12 @@ export const GetVideoResponse = zod.object({
 });
 
 /**
+ * @summary List all unique tags across all videos
+ */
+export const ListAllTagsResponseItem = zod.string();
+export const ListAllTagsResponse = zod.array(ListAllTagsResponseItem);
+
+/**
  * @summary Update a video's tags
  */
 export const UpdateVideoTagsParams = zod.object({

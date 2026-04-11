@@ -161,7 +161,8 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
 
       for (let i = 0; i < vectorResult.rows.length; i++) {
         const row = vectorResult.rows[i];
-        const rrfScore = 1 / (60 + i + 1);
+        const VECTOR_BOOST = 2;
+        const rrfScore = (1 / (60 + i + 1)) * VECTOR_BOOST;
         allResults.push({
           type: String(row.type),
           videoId: Number(row.videoId),
@@ -187,9 +188,10 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
 
       const ftsResult = await client.query(ftsQuery, [expandedQuery, fetchLimit]);
 
+      const FTS_FRAME_BOOST = 0.5;
       for (let i = 0; i < ftsResult.rows.length; i++) {
         const row = ftsResult.rows[i];
-        const rrfScore = 1 / (60 + i + 1);
+        const rrfScore = (1 / (60 + i + 1)) * FTS_FRAME_BOOST;
         allResults.push({
           type: String(row.type),
           videoId: Number(row.videoId),
@@ -297,7 +299,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       `;
 
       const tagFtsResult = await client.query(tagFtsQuery, [expandedQuery, fetchLimit]);
-      const TAG_FTS_BOOST = 2;
+      const TAG_FTS_BOOST = 4;
 
       for (let i = 0; i < tagFtsResult.rows.length; i++) {
         const row = tagFtsResult.rows[i];
@@ -334,9 +336,10 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
 
       const tagFuzzyResult = await client.query(tagFuzzyQuery, [q.toLowerCase(), fetchLimit]);
 
+      const TAG_FUZZY_BOOST = 3;
       for (let i = 0; i < tagFuzzyResult.rows.length; i++) {
         const row = tagFuzzyResult.rows[i];
-        const rrfScore = 1 / (60 + i + 1);
+        const rrfScore = (1 / (60 + i + 1)) * TAG_FUZZY_BOOST;
         allResults.push({
           type: "frame",
           videoId: Number(row.videoId),
@@ -373,9 +376,10 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
 
       const descFuzzyResult = await client.query(descFuzzyQuery, [q.toLowerCase(), fetchLimit]);
 
+      const DESC_FUZZY_BOOST = 0.5;
       for (let i = 0; i < descFuzzyResult.rows.length; i++) {
         const row = descFuzzyResult.rows[i];
-        const rrfScore = 1 / (60 + i + 1);
+        const rrfScore = (1 / (60 + i + 1)) * DESC_FUZZY_BOOST;
         allResults.push({
           type: "frame",
           videoId: Number(row.videoId),
@@ -445,7 +449,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       `;
 
       const annotationFuzzyResult = await client.query(annotationFuzzyQuery, [q.toLowerCase(), fetchLimit]);
-      const ANNOTATION_FUZZY_BOOST = 3;
+      const ANNOTATION_FUZZY_BOOST = 4;
 
       for (let i = 0; i < annotationFuzzyResult.rows.length; i++) {
         const row = annotationFuzzyResult.rows[i];
