@@ -583,6 +583,10 @@ export default function SearchPage() {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
+    if (q) collapse();
+  }, []);
+
+  useEffect(() => {
     setQuery(q);
     setType(typeParam);
   }, [q, typeParam]);
@@ -630,7 +634,6 @@ export default function SearchPage() {
     e.preventDefault();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     updateUrl(query, type);
-    collapse();
   };
 
   const handleTypeChange = (newType: string) => {
