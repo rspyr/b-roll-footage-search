@@ -460,11 +460,21 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       else if (row.feedbackType === "down") entry.down = Number(row.count);
     }
 
-    const FEEDBACK_BOOST = 0.005;
+    const DOWNVOTE_DECAY = 0.70;
+    const UPVOTE_BOOST = 1.15;
+    const MIN_MULTIPLIER = 0.15;
+    const MAX_MULTIPLIER = 2.0;
     for (const [videoId, merged] of mergedMap) {
       const fb = feedbackMap.get(videoId);
       if (fb) {
-        merged.rank += (fb.up - fb.down) * FEEDBACK_BOOST;
+        const net = fb.up - fb.down;
+        let multiplier = 1;
+        if (net < 0) {
+          multiplier = Math.pow(DOWNVOTE_DECAY, Math.abs(net));
+        } else if (net > 0) {
+          multiplier = Math.pow(UPVOTE_BOOST, net);
+        }
+        merged.rank *= Math.max(MIN_MULTIPLIER, Math.min(MAX_MULTIPLIER, multiplier));
       }
     }
 

@@ -89,7 +89,7 @@ A semantic video search application that connects to Google Drive, processes vid
 - **Tag search**: AI-generated concept tags searched via FTS (2x boost) and fuzzy matching (1x)
 - **Fusion**: Results from all sources combined using Reciprocal Rank Fusion (RRF), deduplicated by video, and ranked
 - **Annotation FTS**: User-submitted notes on videos are searched via FTS (1.5x boost) as an additional search channel
-- **Feedback adjustment**: Thumbs up/down feedback shifts RRF scores (±0.005 per vote) using FTS similarity matching on stored queries
+- **Feedback adjustment**: Thumbs up/down feedback applies proportional multipliers to RRF scores (each net downvote decays score by 30%; each net upvote boosts by 15%) using FTS similarity matching on stored queries
 - **RRF boosts**: Title FTS (3x), Title fuzzy (2x), Tag FTS (2x), Annotation FTS (1.5x), Vector (1x), Frame FTS (1x), Transcription FTS (1x), Tag fuzzy (1x), Desc fuzzy (1x)
 - This means "game" can find "Rock Paper Scissors.mp4" because concept tags capture abstract relationships
 
