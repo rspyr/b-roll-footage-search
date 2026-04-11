@@ -117,6 +117,7 @@ export default function VideoDetail() {
   const [editingTags, setEditingTags] = useState(false);
   const [tagsText, setTagsText] = useState("");
   const [newTag, setNewTag] = useState("");
+  const [tagSuggestionIdx, setTagSuggestionIdx] = useState(-1);
   const [showAddFrame, setShowAddFrame] = useState(false);
   const [newFrameTs, setNewFrameTs] = useState("0");
   const [newFrameDesc, setNewFrameDesc] = useState("");
@@ -507,75 +508,91 @@ export default function VideoDetail() {
                   )}
                 </div>
                 <div className="relative mt-2">
-                  <div className="flex gap-2">
-                    <Input
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      placeholder="Add a tag..."
-                      className="h-7 text-sm flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newTag.trim()) {
-                          const existing = video.tags || "";
-                          const trimmedNew = newTag.trim().toLowerCase();
-                          const currentTags = existing.split(",").map((t: string) => t.trim().toLowerCase()).filter(Boolean);
-                          if (currentTags.includes(trimmedNew)) {
-                            setNewTag("");
-                            return;
-                          }
-                          const updated = existing ? `${existing}, ${trimmedNew}` : trimmedNew;
-                          updateTagsMutation.mutate({ id, data: { tags: updated } });
-                        }
-                        if (e.key === "Escape") {
-                          setNewTag("");
-                        }
-                      }}
-                    />
-                    <Button
-                      size="sm"
-                      className="h-7 text-xs"
-                      disabled={!newTag.trim() || updateTagsMutation.isPending}
-                      onClick={() => {
-                        const existing = video.tags || "";
-                        const trimmedNew = newTag.trim().toLowerCase();
-                        const currentTags = existing.split(",").map((t: string) => t.trim().toLowerCase()).filter(Boolean);
-                        if (currentTags.includes(trimmedNew)) {
-                          setNewTag("");
-                          return;
-                        }
-                        const updated = existing ? `${existing}, ${trimmedNew}` : trimmedNew;
-                        updateTagsMutation.mutate({ id, data: { tags: updated } });
-                      }}
-                    >
-                      <Plus size={12} className="mr-1" /> Add
-                    </Button>
-                  </div>
-                  {newTag.trim().length > 0 && allTagsList && (() => {
+                  {(() => {
                     const currentTags = new Set(
                       (video.tags || "").split(",").map((t: string) => t.trim().toLowerCase()).filter(Boolean)
                     );
-                    const suggestions = allTagsList.filter(
-                      (t: string) =>
-                        t.includes(newTag.trim().toLowerCase()) &&
-                        !currentTags.has(t)
-                    );
-                    if (suggestions.length === 0) return null;
+                    const suggestions = newTag.trim().length > 0 && allTagsList
+                      ? allTagsList.filter(
+                          (t: string) =>
+                            t.includes(newTag.trim().toLowerCase()) &&
+                            !currentTags.has(t)
+                        ).slice(0, 10)
+                      : [];
+
+                    const addTag = (tagToAdd: string) => {
+                      const existing = video.tags || "";
+                      const trimmed = tagToAdd.trim().toLowerCase();
+                      if (!trimmed || currentTags.has(trimmed)) {
+                        setNewTag("");
+                        setTagSuggestionIdx(-1);
+                        return;
+                      }
+                      const updated = existing ? `${existing}, ${trimmed}` : trimmed;
+                      updateTagsMutation.mutate({ id, data: { tags: updated } });
+                      setTagSuggestionIdx(-1);
+                    };
+
                     return (
-                      <div className="absolute left-0 right-12 top-8 z-[9999] bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
-                        {suggestions.slice(0, 10).map((suggestion: string) => (
-                          <button
-                            key={suggestion}
-                            className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
-                            onClick={() => {
-                              const existing = video.tags || "";
-                              const updated = existing ? `${existing}, ${suggestion}` : suggestion;
-                              updateTagsMutation.mutate({ id, data: { tags: updated } });
-                              setNewTag("");
+                      <>
+                        <div className="flex gap-2">
+                          <Input
+                            value={newTag}
+                            onChange={(e) => {
+                              setNewTag(e.target.value);
+                              setTagSuggestionIdx(-1);
                             }}
+                            placeholder="Add a tag..."
+                            className="h-7 text-sm flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === "ArrowDown") {
+                                e.preventDefault();
+                                setTagSuggestionIdx((prev) =>
+                                  suggestions.length > 0 ? Math.min(prev + 1, suggestions.length - 1) : -1
+                                );
+                              } else if (e.key === "ArrowUp") {
+                                e.preventDefault();
+                                setTagSuggestionIdx((prev) => Math.max(prev - 1, -1));
+                              } else if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (tagSuggestionIdx >= 0 && tagSuggestionIdx < suggestions.length) {
+                                  addTag(suggestions[tagSuggestionIdx]);
+                                } else if (newTag.trim()) {
+                                  addTag(newTag);
+                                }
+                              } else if (e.key === "Escape") {
+                                setNewTag("");
+                                setTagSuggestionIdx(-1);
+                              }
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={!newTag.trim() || updateTagsMutation.isPending}
+                            onClick={() => addTag(newTag)}
                           >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
+                            <Plus size={12} className="mr-1" /> Add
+                          </Button>
+                        </div>
+                        {suggestions.length > 0 && (
+                          <div className="absolute left-0 right-12 top-8 z-[9999] bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                            {suggestions.map((suggestion: string, idx: number) => (
+                              <button
+                                key={suggestion}
+                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                                  idx === tagSuggestionIdx ? "bg-accent" : "hover:bg-accent"
+                                }`}
+                                onClick={() => {
+                                  addTag(suggestion);
+                                }}
+                              >
+                                {suggestion}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     );
                   })()}
                 </div>
