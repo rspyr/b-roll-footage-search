@@ -185,7 +185,12 @@ function AnnotationPanel({
   onClose: () => void;
 }) {
   const [noteText, setNoteText] = useState("");
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setTimeout(() => noteInputRef.current?.focus(), 50);
+  }, []);
   const { data: annotations, isLoading } = useGetVideoAnnotations(videoId, {
     query: { queryKey: getGetVideoAnnotationsQueryKey(videoId) },
   });
@@ -230,6 +235,7 @@ function AnnotationPanel({
 
       <div className="flex gap-1.5">
         <Textarea
+          ref={noteInputRef}
           value={noteText}
           onChange={(e) => setNoteText(e.target.value)}
           placeholder="Add a note to improve search..."
