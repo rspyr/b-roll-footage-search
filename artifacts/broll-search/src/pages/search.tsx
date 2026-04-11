@@ -87,6 +87,36 @@ function RelevanceBar({ rank, maxRank }: { rank: number; maxRank: number }) {
   );
 }
 
+const FRAME_CACHE_MAX = 500;
+const frameCache = new Map<string, HTMLImageElement>();
+
+function frameCacheGet(url: string): HTMLImageElement | undefined {
+  const img = frameCache.get(url);
+  if (img) {
+    frameCache.delete(url);
+    frameCache.set(url, img);
+  }
+  return img;
+}
+
+function frameCacheSet(url: string, img: HTMLImageElement) {
+  if (frameCache.size >= FRAME_CACHE_MAX) {
+    const oldest = frameCache.keys().next().value;
+    if (oldest) frameCache.delete(oldest);
+  }
+  frameCache.set(url, img);
+}
+
+function preloadFrames(paths: string[]) {
+  for (const p of paths) {
+    const url = `/api/frames/${p}`;
+    if (frameCacheGet(url)) continue;
+    const img = new Image();
+    img.src = url;
+    frameCacheSet(url, img);
+  }
+}
+
 function HoverScrubThumbnail({
   imagePath,
   allFramePaths,
@@ -97,9 +127,54 @@ function HoverScrubThumbnail({
   type: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  const scrubIndexRef = useRef<number | null>(null);
+  const rafRef = useRef<number>(0);
+  const mountedRef = useRef(true);
+  const [displayIndex, setDisplayIndex] = useState<number | null>(null);
+  const [isHovering, setIsHovering] = useState(false);
 
   const frames = allFramePaths && allFramePaths.length > 0 ? allFramePaths : [];
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+    };
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovering(true);
+    if (frames.length > 1) {
+      preloadFrames(frames);
+    }
+  }, [frames]);
+
+  const commitFrame = useCallback(
+    (idx: number) => {
+      if (!mountedRef.current) return;
+      const url = `/api/frames/${frames[idx]}`;
+      const cached = frameCacheGet(url);
+      if (cached && cached.complete) {
+        setDisplayIndex(idx);
+      } else {
+        const img = cached || new Image();
+        if (!cached) {
+          img.src = url;
+          frameCacheSet(url, img);
+        }
+        img.onload = () => {
+          if (mountedRef.current && scrubIndexRef.current === idx) {
+            setDisplayIndex(idx);
+          }
+        };
+      }
+    },
+    [frames]
+  );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -108,18 +183,33 @@ function HoverScrubThumbnail({
       const x = e.clientX - rect.left;
       const pct = Math.max(0, Math.min(1, x / rect.width));
       const idx = Math.min(Math.floor(pct * frames.length), frames.length - 1);
-      setScrubIndex(idx);
+      scrubIndexRef.current = idx;
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = 0;
+          const i = scrubIndexRef.current;
+          if (i !== null) {
+            commitFrame(i);
+          }
+        });
+      }
     },
-    [frames.length]
+    [frames, commitFrame]
   );
 
   const handleMouseLeave = useCallback(() => {
-    setScrubIndex(null);
+    setIsHovering(false);
+    scrubIndexRef.current = null;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+    setDisplayIndex(null);
   }, []);
 
   const displayPath =
-    scrubIndex !== null && frames.length > 0
-      ? frames[scrubIndex]
+    displayIndex !== null && frames.length > 0
+      ? frames[displayIndex]
       : imagePath;
 
   const hasImage = displayPath && !displayPath.startsWith("manual/");
@@ -128,6 +218,7 @@ function HoverScrubThumbnail({
     <div
       ref={containerRef}
       className="w-full h-full relative"
+      onMouseEnter={handleMouseEnter}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
@@ -136,17 +227,18 @@ function HoverScrubThumbnail({
           src={`/api/frames/${displayPath}`}
           alt="Video frame"
           className="w-full h-full object-cover"
+          loading={isHovering ? "eager" : "lazy"}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-muted-foreground">
           <Mic size={32} opacity={0.3} />
         </div>
       )}
-      {scrubIndex !== null && frames.length > 1 && (
+      {displayIndex !== null && frames.length > 1 && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
           <div
             className="h-full bg-white/80 transition-[width] duration-75"
-            style={{ width: `${((scrubIndex + 1) / frames.length) * 100}%` }}
+            style={{ width: `${((displayIndex + 1) / frames.length) * 100}%` }}
           />
         </div>
       )}
