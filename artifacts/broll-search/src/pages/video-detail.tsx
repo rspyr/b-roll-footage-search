@@ -14,6 +14,7 @@ import {
   useGetVideoAnnotations,
   useAddVideoAnnotation,
   getGetVideoAnnotationsQueryKey,
+  useUpdateVideoTags,
 } from "@workspace/api-client-react";
 import type { AnnotationItem } from "@workspace/api-client-react";
 import {
@@ -31,6 +32,7 @@ import {
   RefreshCw,
   MessageSquare,
   Send,
+  Tag,
 } from "lucide-react";
 import { formatDuration, formatBytes, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -110,6 +112,9 @@ export default function VideoDetail() {
   const [editingTransId, setEditingTransId] = useState<number | null>(null);
   const [editingTransText, setEditingTransText] = useState("");
   const [newAnnotation, setNewAnnotation] = useState("");
+  const [editingTags, setEditingTags] = useState(false);
+  const [tagsText, setTagsText] = useState("");
+  const [newTag, setNewTag] = useState("");
   const [showAddFrame, setShowAddFrame] = useState(false);
   const [newFrameTs, setNewFrameTs] = useState("0");
   const [newFrameDesc, setNewFrameDesc] = useState("");
@@ -232,12 +237,31 @@ export default function VideoDetail() {
         toast({ title: "Note Added" });
         setNewAnnotation("");
         queryClient.invalidateQueries({ queryKey: getGetVideoAnnotationsQueryKey(id) });
+        invalidateVideo();
       },
       onError: () => {
         toast({
           variant: "destructive",
           title: "Error",
           description: "Failed to add note.",
+        });
+      },
+    },
+  });
+
+  const updateTagsMutation = useUpdateVideoTags({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Tags Updated" });
+        setEditingTags(false);
+        setNewTag("");
+        invalidateVideo();
+      },
+      onError: () => {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to update tags.",
         });
       },
     },
@@ -380,6 +404,111 @@ export default function VideoDetail() {
                 {video.status}
               </Badge>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto w-full px-4 pt-4">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <div className="p-3 border-b border-border bg-muted/30 font-medium flex items-center gap-2">
+            <Tag size={16} />
+            <span>AI Tags</span>
+            {!editingTags && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs ml-auto"
+                onClick={() => {
+                  setEditingTags(true);
+                  setTagsText(video.tags || "");
+                }}
+              >
+                <Pencil size={12} className="mr-1" /> Edit
+              </Button>
+            )}
+          </div>
+          <div className="p-3">
+            {editingTags ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={tagsText}
+                  onChange={(e) => setTagsText(e.target.value)}
+                  placeholder="Enter comma-separated tags..."
+                  className="text-sm min-h-[60px]"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={updateTagsMutation.isPending}
+                    onClick={() =>
+                      updateTagsMutation.mutate({
+                        id,
+                        data: { tags: tagsText },
+                      })
+                    }
+                  >
+                    {updateTagsMutation.isPending ? (
+                      <Loader2 size={12} className="animate-spin mr-1" />
+                    ) : (
+                      <Check size={12} className="mr-1" />
+                    )}
+                    Save
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setEditingTags(false)}
+                  >
+                    <X size={12} className="mr-1" /> Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {video.tags ? (
+                  video.tags.split(",").map((tag: string, i: number) => (
+                    <Badge key={i} variant="secondary" className="text-xs font-normal">
+                      {tag.trim()}
+                    </Badge>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    No tags generated yet. Tags are created automatically during processing.
+                  </p>
+                )}
+              </div>
+            )}
+            {!editingTags && (
+              <div className="flex gap-2 mt-2">
+                <Input
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  placeholder="Add a tag..."
+                  className="h-7 text-sm flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newTag.trim()) {
+                      const existing = video.tags || "";
+                      const updated = existing ? `${existing}, ${newTag.trim()}` : newTag.trim();
+                      updateTagsMutation.mutate({ id, data: { tags: updated } });
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={!newTag.trim() || updateTagsMutation.isPending}
+                  onClick={() => {
+                    const existing = video.tags || "";
+                    const updated = existing ? `${existing}, ${newTag.trim()}` : newTag.trim();
+                    updateTagsMutation.mutate({ id, data: { tags: updated } });
+                  }}
+                >
+                  <Plus size={12} className="mr-1" /> Add
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

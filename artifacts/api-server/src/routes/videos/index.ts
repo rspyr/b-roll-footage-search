@@ -164,6 +164,35 @@ router.post("/videos/sync", syncRateLimit, async (req, res): Promise<void> => {
   });
 });
 
+router.patch("/videos/:id/tags", async (req, res): Promise<void> => {
+  const videoId = parseInt(req.params.id);
+  if (isNaN(videoId)) {
+    res.status(400).json({ error: "Invalid video ID" });
+    return;
+  }
+
+  const { tags } = req.body;
+  if (typeof tags !== "string") {
+    res.status(400).json({ error: "tags is required and must be a string" });
+    return;
+  }
+
+  const [video] = await db.select().from(videosTable).where(eq(videosTable.id, videoId));
+  if (!video) {
+    res.status(404).json({ error: "Video not found" });
+    return;
+  }
+
+  const normalizedTags = tags
+    .split(",")
+    .map((t: string) => t.trim().toLowerCase())
+    .filter(Boolean)
+    .join(", ");
+
+  await db.update(videosTable).set({ tags: normalizedTags }).where(eq(videosTable.id, videoId));
+  res.json({ success: true });
+});
+
 let backfillInProgress = false;
 
 router.post("/videos/backfill-tags", async (_req, res): Promise<void> => {

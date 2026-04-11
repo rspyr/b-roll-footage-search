@@ -11,7 +11,7 @@ import {
   getGetAnnotationStatusQueryKey,
 } from "@workspace/api-client-react";
 import type { AnnotationItem, GetAnnotationStatus200 } from "@workspace/api-client-react";
-import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3 } from "lucide-react";
+import { Search as SearchIcon, Image as ImageIcon, Mic, Loader2, ArrowRight, Sparkles, Link as LinkIcon, Check, Info, ThumbsUp, ThumbsDown, MessageSquare, Send, X, Grid2x2, Grid3x3, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,6 +65,7 @@ interface SearchResultItem {
   driveFileId?: string | null;
   allFramePaths?: string[];
   rank: number;
+  videoTags?: string | null;
 }
 
 function RelevanceBar({ rank, maxRank }: { rank: number; maxRank: number }) {
@@ -444,6 +445,35 @@ function SearchResults({
               >
                 &ldquo;{result.content}&rdquo;
               </p>
+
+              {result.videoTags && (
+                <div
+                  className="flex flex-wrap gap-1 items-center"
+                  style={{ marginTop: `${Math.round(6 * config.padding)}px` }}
+                >
+                  <Tag size={Math.max(9, Math.round(11 * config.scale))} className="text-muted-foreground shrink-0" />
+                  {result.videoTags.split(",").slice(0, 6).map((tag, ti) => (
+                    <span
+                      key={ti}
+                      className="bg-muted text-muted-foreground rounded-full"
+                      style={{
+                        fontSize: `${Math.max(9, Math.round(11 * config.fontSize))}px`,
+                        padding: `${Math.round(2 * config.padding)}px ${Math.round(6 * config.padding)}px`,
+                      }}
+                    >
+                      {tag.trim()}
+                    </span>
+                  ))}
+                  {result.videoTags.split(",").length > 6 && (
+                    <span
+                      className="text-muted-foreground"
+                      style={{ fontSize: `${Math.max(9, Math.round(11 * config.fontSize))}px` }}
+                    >
+                      +{result.videoTags.split(",").length - 6}
+                    </span>
+                  )}
+                </div>
+              )}
               
               <div style={{ marginTop: `${Math.round(12 * config.padding)}px` }}>
                 <RelevanceBar rank={result.rank} maxRank={maxRank} />

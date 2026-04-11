@@ -67,8 +67,9 @@ A semantic video search application that connects to Google Drive, processes vid
 - `POST /api/videos/:id/transcriptions` — Add a manual transcription segment to a video
 - `POST /api/videos/backfill-tags` — Generate AI concept tags for all completed videos missing tags (runs async in background)
 - `POST /api/search/feedback` — Submit thumbs up/down feedback on a search result (stacking: repeated clicks compound the effect)
+- `PATCH /api/videos/:id/tags` — Update a video's tags (comma-separated string, auto-normalized to lowercase)
 - `GET /api/videos/:id/annotations` — List annotations for a video
-- `POST /api/videos/:id/annotations` — Add an annotation note to a video (also regenerates AI tags)
+- `POST /api/videos/:id/annotations` — Add an annotation note to a video (also regenerates AI tags and embeds annotations for vector search)
 - `GET /api/annotations/status?videoIds=1,2,3` — Check which videos have annotations (returns map of videoId to count)
 
 ### Processing Pipeline
@@ -88,9 +89,9 @@ A semantic video search application that connects to Google Drive, processes vid
 - **Fuzzy matching**: `pg_trgm` word_similarity matching on titles, frame descriptions, and tags
 - **Tag search**: AI-generated concept tags searched via FTS (2x boost) and fuzzy matching (1x)
 - **Fusion**: Results from all sources combined using Reciprocal Rank Fusion (RRF), deduplicated by video, and ranked
-- **Annotation FTS**: User-submitted notes on videos are searched via FTS (1.5x boost) as an additional search channel
-- **Feedback adjustment**: Thumbs up/down feedback applies proportional multipliers to RRF scores (each net downvote decays score by 30%; each net upvote boosts by 15%) using FTS similarity matching on stored queries
-- **RRF boosts**: Title FTS (3x), Title fuzzy (2x), Tag FTS (2x), Annotation FTS (1.5x), Vector (1x), Frame FTS (1x), Transcription FTS (1x), Tag fuzzy (1x), Desc fuzzy (1x)
+- **Annotation search**: User-submitted notes on videos are searched via FTS (5x boost — highest weight) and fuzzy matching (3x boost). Adding annotations also embeds them as vectors (stored as video_segments with startSec=-1) for semantic search.
+- **Feedback adjustment**: Thumbs up/down feedback applies proportional multipliers to RRF scores (each net downvote decays score by 30%; each net upvote boosts by 15%, clamped to 0.15–2.0x) using FTS similarity matching on stored queries
+- **RRF boosts**: Annotation FTS (5x), Annotation fuzzy (3x), Title FTS (3x), Title fuzzy (2x), Tag FTS (2x), Vector (1x), Frame FTS (1x), Transcription FTS (1x), Tag fuzzy (1x), Desc fuzzy (1x)
 - This means "game" can find "Rock Paper Scissors.mp4" because concept tags capture abstract relationships
 
 ### Frame Storage (Object Storage)

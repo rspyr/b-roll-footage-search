@@ -409,7 +409,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
       `;
 
       const annotationFtsResult = await client.query(annotationFtsQuery, [expandedQuery, fetchLimit]);
-      const ANNOTATION_FTS_BOOST = 1.5;
+      const ANNOTATION_FTS_BOOST = 5;
 
       for (let i = 0; i < annotationFtsResult.rows.length; i++) {
         const row = annotationFtsResult.rows[i];
@@ -425,6 +425,42 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
           imagePath: row.imagePath ? String(row.imagePath) : null,
           rank: rrfScore,
           source: "annotation_fts",
+        });
+      }
+
+      const annotationFuzzyQuery = `
+        SELECT
+          va.video_id as "videoId",
+          v.title as "videoTitle",
+          v.drive_file_id as "driveFileId",
+          v.duration::double precision as "endSec",
+          va.content as content,
+          (SELECT f.image_path FROM frames f WHERE f.video_id = v.id ORDER BY f.timestamp_sec LIMIT 1) as "imagePath",
+          word_similarity($1, lower(va.content)) as sim
+        FROM video_annotations va
+        JOIN videos v ON v.id = va.video_id
+        WHERE word_similarity($1, lower(va.content)) > 0.3
+        ORDER BY sim DESC
+        LIMIT $2
+      `;
+
+      const annotationFuzzyResult = await client.query(annotationFuzzyQuery, [q.toLowerCase(), fetchLimit]);
+      const ANNOTATION_FUZZY_BOOST = 3;
+
+      for (let i = 0; i < annotationFuzzyResult.rows.length; i++) {
+        const row = annotationFuzzyResult.rows[i];
+        const rrfScore = (1 / (60 + i + 1)) * ANNOTATION_FUZZY_BOOST;
+        allResults.push({
+          type: "frame",
+          videoId: Number(row.videoId),
+          videoTitle: String(row.videoTitle),
+          driveFileId: row.driveFileId ? String(row.driveFileId) : null,
+          timestampSec: 0,
+          endSec: row.endSec != null ? Number(row.endSec) : null,
+          content: `Annotation match: ${String(row.content)}`,
+          imagePath: row.imagePath ? String(row.imagePath) : null,
+          rank: rrfScore,
+          source: "annotation_fuzzy",
         });
       }
     }
@@ -486,16 +522,26 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
 
     const videoIds = [...new Set(paged.map(r => r.videoId))];
     const framePathsMap = new Map<number, string[]>();
+    const tagsMap = new Map<number, string | null>();
     if (videoIds.length > 0) {
       const placeholders = videoIds.map((_, i) => `$${i + 1}`).join(",");
-      const framesResult = await client.query(
-        `SELECT video_id, image_path FROM frames WHERE video_id IN (${placeholders}) AND image_path IS NOT NULL AND image_path NOT LIKE 'manual/%' ORDER BY video_id, timestamp_sec`,
-        videoIds
-      );
+      const [framesResult, tagsResult] = await Promise.all([
+        client.query(
+          `SELECT video_id, image_path FROM frames WHERE video_id IN (${placeholders}) AND image_path IS NOT NULL AND image_path NOT LIKE 'manual/%' ORDER BY video_id, timestamp_sec`,
+          videoIds
+        ),
+        client.query(
+          `SELECT id, tags FROM videos WHERE id IN (${placeholders})`,
+          videoIds
+        ),
+      ]);
       for (const row of framesResult.rows) {
         const vid = Number(row.video_id);
         if (!framePathsMap.has(vid)) framePathsMap.set(vid, []);
         framePathsMap.get(vid)!.push(String(row.image_path));
+      }
+      for (const row of tagsResult.rows) {
+        tagsMap.set(Number(row.id), row.tags ? String(row.tags) : null);
       }
     }
 
@@ -511,6 +557,7 @@ router.get("/search", searchRateLimit, async (req, res): Promise<void> => {
         imagePath: r.imagePath,
         allFramePaths: framePathsMap.get(r.videoId) || [],
         rank: r.rank,
+        videoTags: tagsMap.get(r.videoId) || null,
       })),
       total,
       query: q,

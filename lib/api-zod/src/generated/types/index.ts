@@ -40,6 +40,7 @@ export * from "./syncResponse";
 export * from "./transcriptionItem";
 export * from "./updateFrameBody";
 export * from "./updateTranscriptionBody";
+export * from "./updateVideoTagsBody";
 export * from "./video";
 export * from "./videoDetail";
 export * from "./videoStatus";

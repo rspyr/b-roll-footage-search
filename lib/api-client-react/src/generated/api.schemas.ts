@@ -78,6 +78,8 @@ export interface VideoDetail {
   status: string;
   /** @nullable */
   processingError?: string | null;
+  /** @nullable */
+  tags?: string | null;
   createdAt: string;
   updatedAt: string;
   frames: FrameItem[];
@@ -129,6 +131,8 @@ export interface SearchResult {
   imagePath?: string | null;
   allFramePaths?: string[];
   rank: number;
+  /** @nullable */
+  videoTags?: string | null;
 }
 
 export interface SearchResults {
@@ -184,6 +188,12 @@ export interface FolderResyncResult {
   videos: Video[];
 }
 
+export interface SyncAllFoldersResult {
+  newVideoCount: number;
+  folderCount: number;
+  message: string;
+}
+
 export type SearchFeedbackBodyFeedbackType =
   (typeof SearchFeedbackBodyFeedbackType)[keyof typeof SearchFeedbackBodyFeedbackType];
 
@@ -196,6 +206,10 @@ export interface SearchFeedbackBody {
   videoId: number;
   query: string;
   feedbackType: SearchFeedbackBodyFeedbackType;
+}
+
+export interface UpdateVideoTagsBody {
+  tags: string;
 }
 
 export interface SuccessResponse {
@@ -212,12 +226,6 @@ export interface AnnotationItem {
 
 export interface AddAnnotationBody {
   content: string;
-}
-
-export interface SyncAllFoldersResult {
-  newVideoCount: number;
-  folderCount: number;
-  message: string;
 }
 
 export interface UpdateFrameBody {

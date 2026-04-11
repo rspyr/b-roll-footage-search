@@ -21,4 +21,6 @@ export interface SearchResult {
   imagePath?: string | null;
   allFramePaths?: string[];
   rank: number;
+  /** @nullable */
+  videoTags?: string | null;
 }

@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import { db, videoAnnotationsTable, videosTable, framesTable, transcriptionsTable } from "@workspace/db";
+import { db, videoAnnotationsTable, videosTable, framesTable, transcriptionsTable, videoSegmentsTable } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import { generateVideoTags } from "../../lib/video-processor";
+import { gemini } from "../../lib/gemini";
 
 const router: IRouter = Router();
 
@@ -70,6 +71,38 @@ router.post("/videos/:id/annotations", async (req, res): Promise<void> => {
       logger.info({ videoId, annotationId: annotation.id }, "Regenerated tags after annotation");
     } catch (err) {
       logger.warn({ err, videoId }, "Failed to regenerate tags after annotation (non-fatal)");
+    }
+
+    try {
+      const allAnnotations = await db
+        .select({ content: videoAnnotationsTable.content })
+        .from(videoAnnotationsTable)
+        .where(eq(videoAnnotationsTable.videoId, videoId));
+      const combinedText = allAnnotations.map(a => a.content).join(". ");
+
+      const embedResult = await gemini.models.embedContent({
+        model: "gemini-embedding-2-preview",
+        contents: combinedText,
+        config: { outputDimensionality: 768 },
+      });
+      const embedding = embedResult.embeddings?.[0]?.values;
+      if (embedding) {
+        const [v] = await db.select({ duration: videosTable.duration }).from(videosTable).where(eq(videosTable.id, videoId)).limit(1);
+        const dur = v?.duration ?? 0;
+
+        await db.delete(videoSegmentsTable).where(
+          sql`${videoSegmentsTable.videoId} = ${videoId} AND ${videoSegmentsTable.startSec} = -1`
+        );
+        await db.insert(videoSegmentsTable).values({
+          videoId,
+          startSec: -1,
+          endSec: dur,
+          embedding,
+        });
+        logger.info({ videoId }, "Embedded annotation text for vector search");
+      }
+    } catch (err) {
+      logger.warn({ err, videoId }, "Failed to embed annotation text (non-fatal)");
     }
 
     res.status(201).json(annotation);

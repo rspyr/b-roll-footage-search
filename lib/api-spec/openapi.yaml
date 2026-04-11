@@ -77,6 +77,33 @@ paths:
         "404":
           description: Video not found
 
+  /videos/{id}/tags:
+    patch:
+      operationId: updateVideoTags
+      tags: [videos]
+      summary: Update a video's tags
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVideoTagsBody"
+      responses:
+        "200":
+          description: Tags updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Video not found
+
   /videos/{id}/process:
     post:
       operationId: processVideo
@@ -588,6 +615,8 @@ components:
           type: string
         processingError:
           type: ["string", "null"]
+        tags:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
@@ -753,6 +782,8 @@ components:
             type: string
         rank:
           type: number
+        videoTags:
+          type: ["string", "null"]
       required:
         - type
         - videoId
@@ -900,6 +931,14 @@ components:
         - videoId
         - query
         - feedbackType
+
+    UpdateVideoTagsBody:
+      type: object
+      properties:
+        tags:
+          type: string
+      required:
+        - tags
 
     SuccessResponse:
       type: object

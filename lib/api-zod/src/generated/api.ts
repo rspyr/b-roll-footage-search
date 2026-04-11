@@ -66,6 +66,7 @@ export const GetVideoResponse = zod.object({
   thumbnailPath: zod.string().nullish(),
   status: zod.string(),
   processingError: zod.string().nullish(),
+  tags: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
   frames: zod.array(
@@ -88,6 +89,21 @@ export const GetVideoResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
+});
+
+/**
+ * @summary Update a video's tags
+ */
+export const UpdateVideoTagsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateVideoTagsBody = zod.object({
+  tags: zod.string(),
+});
+
+export const UpdateVideoTagsResponse = zod.object({
+  success: zod.boolean(),
 });
 
 /**
@@ -221,6 +237,7 @@ export const SearchContentResponse = zod.object({
       imagePath: zod.string().nullish(),
       allFramePaths: zod.array(zod.string()).optional(),
       rank: zod.number(),
+      videoTags: zod.string().nullish(),
     }),
   ),
   total: zod.number(),
@@ -342,6 +359,15 @@ export const RemoveFolderResponse = zod.object({
 });
 
 /**
+ * @summary Re-scan all tracked Google Drive folders for new clips
+ */
+export const SyncAllFoldersResponse = zod.object({
+  newVideoCount: zod.number(),
+  folderCount: zod.number(),
+  message: zod.string(),
+});
+
+/**
  * @summary Submit thumbs up/down feedback on a search result
  */
 export const SubmitSearchFeedbackBody = zod.object({
@@ -394,15 +420,6 @@ export const GetAnnotationStatusResponse = zod.record(
   zod.string(),
   zod.number(),
 );
-
-/**
- * @summary Re-scan all tracked Google Drive folders for new clips
- */
-export const SyncAllFoldersResponse = zod.object({
-  newVideoCount: zod.number(),
-  folderCount: zod.number(),
-  message: zod.string(),
-});
 
 /**
  * @summary Re-sync a folder to find new videos from Google Drive

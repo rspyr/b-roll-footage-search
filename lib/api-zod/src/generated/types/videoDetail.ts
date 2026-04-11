@@ -26,6 +26,8 @@ export interface VideoDetail {
   status: string;
   /** @nullable */
   processingError?: string | null;
+  /** @nullable */
+  tags?: string | null;
   createdAt: Date;
   updatedAt: Date;
   frames: FrameItem[];
